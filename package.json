@@ -11,7 +11,8 @@
     "index.server.ts",
     "client/",
     "server/",
-    "shared/"
+    "shared/",
+    "assets/"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -30,6 +31,6 @@
     "eslint-plugin-react-hooks": "^6.0.0",
     "typescript-eslint": "^8.0.0"
   },
-  "description": "Paseo 插件：TAPD 工作台（视图过滤、派发 Agent、回写评论与状态）",
+  "description": "Paseo plugin: TAPD workbench (filter views, agent dispatch, comment and status write-back)",
   "license": "MIT"
 }

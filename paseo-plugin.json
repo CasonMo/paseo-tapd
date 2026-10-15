@@ -1,9 +1,12 @@
 {
   "id": "tapd-workbench",
-  "name": "TAPD 工作台",
-  "description": "在 Paseo 中查看与处理 TAPD 需求、任务与缺陷：过滤视图、派给 Agent、评论与状态回写",
-  "media": [],
+  "name": "TAPD Workbench",
+  "description": "View and work on TAPD stories, tasks, and bugs in Paseo: filter views, agent dispatch, comment and status write-back",
+  "media": [
+    "assets/screenshots/workbench.png"
+  ],
   "requirements": {
     "paseo": ">=0.11.2"
-  }
+  },
+  "icon": "assets/icon.png"
 }
