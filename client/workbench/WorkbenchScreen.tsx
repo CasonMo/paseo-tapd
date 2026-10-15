@@ -159,6 +159,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   // 收窄后的设置句柄，供下方闭包使用（闭包不继承外层控制流收窄）
   const readySettings = settings;
   const favorites = readySettings.values.favorites;
+  const groupByStatus = readySettings.values.groupByStatus;
   const links = readySettings.values.links;
   const linkedKeys = links.map((link) => link.key);
   const views = effectiveViews(readySettings.values);
@@ -221,6 +222,14 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     const current = readySettings.values.favorites;
     const next = current.includes(key) ? current.filter((item) => item !== key) : [...current, key];
     const ok = await readySettings.save({ ...readySettings.values, favorites: next }, readySettings.revision);
+    if (!ok) toast.error(readySettings.saveError ?? "保存失败，请重试");
+  }
+
+  async function toggleGrouped() {
+    const ok = await readySettings.save(
+      { ...readySettings.values, groupByStatus: !readySettings.values.groupByStatus },
+      readySettings.revision,
+    );
     if (!ok) toast.error(readySettings.saveError ?? "保存失败，请重试");
   }
 
@@ -303,6 +312,9 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
         {activeTab !== "all" ? (
           <ToolbarButton icon="Columns3" label="列" theme={theme} onPress={() => setColumnsOpen(true)} />
         ) : null}
+        {activeTab === "all" ? (
+          <ToolbarButton icon="Rows3" label="分组" theme={theme} active={groupByStatus} onPress={() => void toggleGrouped()} />
+        ) : null}
         <ToolbarButton icon="Plus" label="新建" theme={theme} onPress={() => setCreateOpen(true)} />
         <ToolbarButton icon="RefreshCw" label="刷新" theme={theme} busy={board.isFetching} onPress={() => void board.refetch()} />
         <ToolbarButton icon="Settings" theme={theme} onPress={() => setSettingsOpen(true)} />
@@ -350,6 +362,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                   {KINDS.map((kind) => (
                     <KindColumn
                       key={kind}
+                      kind={kind}
                       label={KIND_TITLES[kind]}
                       items={board.data.columns[kind].items}
                       total={board.data.columns[kind].total}
@@ -358,6 +371,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                       flex={false}
                       width={252}
                       emptyText={emptyText}
+                      grouped={groupByStatus}
                       favorites={favorites}
                       linkedKeys={linkedKeys}
                       onToggleFavorite={(key) => void toggleFavorite(key)}
@@ -371,6 +385,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                 {KINDS.map((kind) => (
                   <KindColumn
                     key={kind}
+                    kind={kind}
                     label={KIND_TITLES[kind]}
                     items={board.data.columns[kind].items}
                     total={board.data.columns[kind].total}
@@ -379,6 +394,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                     flex
                     width={300}
                     emptyText={emptyText}
+                    grouped={groupByStatus}
                     favorites={favorites}
                     linkedKeys={linkedKeys}
                     onToggleFavorite={(key) => void toggleFavorite(key)}
