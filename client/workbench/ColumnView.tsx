@@ -13,6 +13,12 @@ export function entityKey(entity: { kind: BoardEntityItem["kind"]; id: string })
   return `${entity.kind}-${entity.id}`;
 }
 
+function sortPinnedFirst(items: readonly BoardEntityItem[], favorites: readonly string[]): BoardEntityItem[] {
+  const isPinned = (item: BoardEntityItem) => favorites.includes(entityKey(item));
+  // 稳定排序：收藏置顶，其余保持服务端顺序（修改时间倒序）
+  return [...items].sort((a, b) => Number(isPinned(b)) - Number(isPinned(a)));
+}
+
 /** 看板状态列：一列 = 一个状态 */
 export function StatusColumn({ kind, status, label, items, theme, width, favorites, linkedKeys, onToggleFavorite, onOpen }: {
   kind: BoardEntityItem["kind"];
@@ -26,11 +32,7 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
   onToggleFavorite: (key: string) => void;
   onOpen: (entity: BoardEntityItem) => void;
 }) {
-  const ordered = useMemo(() => {
-    const isPinned = (item: BoardEntityItem) => favorites.includes(entityKey(item));
-    // 稳定排序：收藏置顶，其余保持服务端顺序（修改时间倒序）
-    return [...items].sort((a, b) => Number(isPinned(b)) - Number(isPinned(a)));
-  }, [items, favorites]);
+  const ordered = useMemo(() => sortPinnedFirst(items, favorites), [items, favorites]);
 
   const tone = statusTone(kind, status);
 
@@ -130,5 +132,73 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
         {entity.owner ? ` · ${entity.owner}` : ""}
       </Text>
     </Pressable>
+  );
+}
+
+/** 类型列（聚合 tab）：一列 = 一个单据类型 */
+export function KindColumn({ label, items, total, truncated, theme, flex, width, emptyText, favorites, linkedKeys, onToggleFavorite, onOpen }: {
+  label: string;
+  items: BoardEntityItem[];
+  total: number;
+  truncated: boolean;
+  theme: WorkbenchTheme;
+  flex: boolean;
+  width: number;
+  emptyText: string;
+  favorites: readonly string[];
+  linkedKeys: readonly string[];
+  onToggleFavorite: (key: string) => void;
+  onOpen: (entity: BoardEntityItem) => void;
+}) {
+  const ordered = useMemo(() => sortPinnedFirst(items, favorites), [items, favorites]);
+
+  const styles = useMemo<{ column: ViewStyle; header: ViewStyle; title: TextStyle; count: TextStyle; list: ViewStyle; empty: TextStyle }>(() => ({
+    column: {
+      flex: flex ? 1 : undefined,
+      width: flex ? undefined : width,
+      minWidth: flex ? 0 : undefined,
+      backgroundColor: theme.colors.surface0,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      borderRadius: 10,
+      padding: 10,
+      gap: 8,
+    },
+    header: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", paddingHorizontal: 2 },
+    title: { color: theme.colors.foreground, fontSize: 14, fontWeight: "600" },
+    count: { color: theme.colors.foregroundMuted, fontSize: 12 },
+    list: { gap: 8, paddingBottom: 4 },
+    empty: { color: theme.colors.foregroundMuted, fontSize: 12, paddingHorizontal: 2, paddingVertical: 6 },
+  }), [theme, flex, width]);
+
+  return (
+    <View style={styles.column}>
+      <View style={styles.header}>
+        <Text style={styles.title}>{label}</Text>
+        <Text style={styles.count}>
+          {truncated ? `${items.length} / 共 ${total} 条` : `共 ${total} 条`}
+        </Text>
+      </View>
+      {ordered.length === 0 ? (
+        <Text style={styles.empty}>{emptyText}</Text>
+      ) : (
+        <ScrollView style={{ flex: 1, minHeight: 0 }} contentContainerStyle={styles.list}>
+          {ordered.map((item) => {
+            const key = entityKey(item);
+            return (
+              <EntityCard
+                key={key}
+                entity={item}
+                theme={theme}
+                pinned={favorites.includes(key)}
+                linked={linkedKeys.includes(key)}
+                onTogglePinned={() => onToggleFavorite(key)}
+                onPress={() => onOpen(item)}
+              />
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
   );
 }

@@ -6,7 +6,7 @@ A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo works
 
 ## Features
 
-- Tabbed board (stories / tasks / bugs); each tab is a status-column kanban with selectable columns, colored status labels, and starred pinning
+- Aggregate tab (stories / tasks / bugs side by side) plus one tab per type with a status-column kanban; selectable columns, colored status labels, and starred pinning
 - Views as reusable filter presets: built-in "Related to me" (owner, creator, watcher, or commenter), plus keyword, owner, creator, status scope, iteration, updated-within, priorities, bug severities, labels, and any field from the workspace's TAPD field definitions
 - Detail window with description, comments, open-in-TAPD, and copy-link
 - Dispatch to an agent: pick a repository and provider/model; the plugin creates a worktree workspace and starts an agent preloaded with the item snapshot, then tracks it from the card
@@ -58,6 +58,6 @@ MIT
 
 ## 中文说明（简版）
 
-TAPD 工作台 Paseo 插件：需求/任务/缺陷 三个 tab，按状态分列看板（列可自选）、可复用视图过滤（内置「我相关的」）、单据详情浮窗、派给 Agent（worktree + agent 关联追踪）、评论与状态回写、单据快照附件源、工作台内直接建单。
+TAPD 工作台 Paseo 插件：聚合（三栏并排）+ 需求/任务/缺陷 tab，按状态分列看板（列可自选）、可复用视图过滤（内置「我相关的」）、单据详情浮窗、派给 Agent（worktree + agent 关联追踪）、评论与状态回写、单据快照附件源、工作台内直接建单。
 
 安装：`paseo plugin add git:CasonMo/paseo-tapd`（需 Paseo >= 0.11.2），安装后在插件设置中填写 TAPD Token 与项目 ID（或配置环境变量 `TAPD_TOKEN` / `TAPD_WORKSPACE_IDS`）。能力与数据流向的完整说明见 `OVERVIEW.md`。
