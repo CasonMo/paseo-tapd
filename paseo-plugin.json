@@ -1,0 +1,9 @@
+{
+  "id": "tapd-workbench",
+  "name": "TAPD 工作台",
+  "description": "在 Paseo 中查看 TAPD 需求、任务与缺陷，支持搜索并附加单据到对话",
+  "media": [],
+  "requirements": {
+    "paseo": ">=0.11.2"
+  }
+}
