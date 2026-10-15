@@ -1,7 +1,7 @@
 {
   "id": "tapd-workbench",
   "name": "TAPD 工作台",
-  "description": "在 Paseo 中查看 TAPD 需求、任务与缺陷，支持搜索并附加单据到对话",
+  "description": "在 Paseo 中查看与处理 TAPD 需求、任务与缺陷：过滤视图、派给 Agent、评论与状态回写",
   "media": [],
   "requirements": {
     "paseo": ">=0.11.2"

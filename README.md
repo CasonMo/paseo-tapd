@@ -15,10 +15,14 @@ Paseo 插件：在 Paseo 内查看与处理 TAPD 需求 / 任务 / 缺陷。
 
 ## 安装
 
-需要 Paseo >= 0.11.2（daemon 与客户端）。团队内网 Git 安装：
+需要 Paseo >= 0.11.2（daemon 与客户端）。从 Git 源安装：
 
 ```bash
+# 将 <repo-url> 替换为本仓库的克隆地址（HTTPS 或 SSH 均可）
 paseo plugin add git:<repo-url>
+
+# 托管在 GitHub 时可用简写
+paseo plugin add git:<owner>/<repo>
 ```
 
 安装后在 Settings → Plugins 启用（插件开关需打开），并在插件设置中配置：
