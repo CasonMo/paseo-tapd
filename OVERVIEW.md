@@ -1,7 +1,11 @@
-TAPD 工作台在 Paseo 中查看与处理 TAPD 的需求、任务和缺陷。
+TAPD workbench brings TAPD (stories, tasks, and bugs) into Paseo.
 
-主界面是三栏视图：需求、任务、缺陷各一栏，顶部是可直接操作的过滤栏：关键词、处理人（我/我相关（处理/创建/抄送/评论）/全部/指定）、创建人、状态范围（全部/进行中/已结束）、迭代、更新时间（近 7/30/90 天）、优先级多选、缺陷严重程度多选、标签。「更多筛选」支持动态获取的任意 TAPD 字段（预计开始/结束、发布计划、附件、关联需求、各类自定义字段等，字段清单来自 TAPD 字段定义自动同步）。任意一组过滤条件可以保存为「视图」复用：工具栏一键切换，可更新当前视图、另存为新视图、在设置里设为默认或删除。默认内置「我相关的」视图（处理人、创建人、抄送人、评论人任一为我）。点开任意条目查看状态、处理人、描述与最新评论，并可直接跳转 TAPD 网页。支持列内按状态分组（可折叠）、收藏置顶（星标）、以及从工作台直接新建需求/任务/缺陷；移动端为 需求/任务/缺陷 标签页切换。支持从单据一键派发 Agent：选择仓库与模型后自动创建 worktree 工作区并启动携带单据上下文的 agent，派发记录在卡片与详情中可追踪；并可写回 TAPD：提交评论（自动转 HTML）、切换工作流状态。
+The main screen is a three-column board: stories, tasks, and bugs side by side, grouped by status with collapsible headers and colored status labels. Filters cover keyword, owner, creator, status scope, iteration, updated-within window, priorities, bug severities, and labels, plus any field reported by the workspace's TAPD field definitions (synced automatically). A filter combination can be saved as a reusable view, switched from the toolbar, updated in place, or set as the default. The built-in "Related to me" view matches items where you are the owner, creator, watcher, or commenter. Cards can be starred to pin them to the top.
 
-还可以在给 agent 写提示词时附加 TAPD 单据：选择「TAPD 单据」附件源，搜索标题关键字或单据编号，被选中的单据会以文本快照形式（标题、状态、处理人、链接）附到对话里。
+Opening an item shows status, owner, creator, iteration, description, and recent comments in a detail window, with actions to open it in TAPD or copy its link.
 
-连接方式：插件在 daemon 侧调用 TAPD OpenAPI，除该接口外不向任何其他服务发送数据，凭证仅用于 TAPD 请求头。Token 和项目 ID 优先读取插件设置页，留空时回退到 daemon 环境变量 TAPD_TOKEN 与 TAPD_WORKSPACE_IDS。写入操作（评论、状态流转、新建单据）只在用户明确操作时发起，派发 Agent 通过 Paseo SDK 在用户确认后执行。需要 Paseo 0.11.2 或更高版本。已知限制：评论人维度基于最近 200 条评论；看板单列最多展示 300 条。
+Workflow features: dispatch an item to a coding agent by picking a repository and provider/model; the plugin creates a worktree workspace and starts an agent whose prompt contains the item snapshot. Dispatched workspaces and agents are tracked from the item and the card. The plugin can write a comment back to TAPD (plain text converted to HTML), change the item's workflow status, and create new stories, tasks, or bugs from the board.
+
+An attachment source lets you search TAPD items by keyword or ID while composing a prompt and attach a text snapshot (title, status, owner, link).
+
+Connection and data: the plugin runs on the daemon side and calls the TAPD OpenAPI only; no other service receives data, and the token is used solely as the TAPD Authorization header. Credentials and project IDs come from the plugin settings screen, falling back to the daemon environment variables TAPD_TOKEN and TAPD_WORKSPACE_IDS. Write operations (comments, status changes, item creation) run only on explicit user action; agent dispatch goes through the Paseo SDK after confirmation in the dispatch dialog. Requires Paseo 0.11.2 or later. Known limits: commenter matching uses the 200 most recent comments; each board column shows at most 300 items.

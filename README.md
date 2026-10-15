@@ -1,49 +1,61 @@
-# Paseo TAPD 工作台
+# Paseo TAPD Workbench
 
-Paseo 插件：在 Paseo 内查看与处理 TAPD 需求 / 任务 / 缺陷。
+A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo workspace: a three-column board, reusable views, agent dispatch, and comment/status write-back.
 
-## 功能
+![TAPD workbench](assets/screenshots/workbench.png)
 
-- 三栏工作台（需求 / 任务 / 缺陷），列内按状态分组（可折叠）、收藏置顶（星标）
-- 视图：过滤条件自由组合并保存复用；内置「我相关的」（处理人 / 创建人 / 抄送人 / 评论人 并集）
-- 过滤维度：状态、更新时间、关键词、处理人、创建人、迭代、优先级、严重程度、标签，以及从 TAPD 字段定义动态同步的任意字段
-- 详情：描述、评论列表、跳转 TAPD 网页
-- 派给 Agent：选择仓库与模型，一键创建 worktree 工作区并启动携带单据上下文的 agent；卡片与详情可追踪关联
-- 回写 TAPD：提交评论（自动转 HTML）、切换工作流状态
-- 组合器附件源：在对话中搜索 TAPD 单据并以快照形式附加到 prompt
-- 新建单据：从工作台直接创建需求 / 任务 / 缺陷
+## Features
 
-## 安装
+- Three-column board (stories / tasks / bugs) with collapsible status groups, colored status labels, and starred pinning
+- Views as reusable filter presets: built-in "Related to me" (owner, creator, watcher, or commenter), plus keyword, owner, creator, status scope, iteration, updated-within, priorities, bug severities, labels, and any field from the workspace's TAPD field definitions
+- Detail window with description, comments, open-in-TAPD, and copy-link
+- Dispatch to an agent: pick a repository and provider/model; the plugin creates a worktree workspace and starts an agent preloaded with the item snapshot, then tracks it from the card
+- Write back to TAPD: comments (plain text converted to HTML), workflow status changes, and new item creation
+- Attachment source: search TAPD items while composing a prompt and attach a snapshot
 
-需要 Paseo >= 0.11.2（daemon 与客户端）。从 Git 源安装：
+## Install
+
+Requires Paseo >= 0.11.2 (daemon and client).
 
 ```bash
-# 将 <repo-url> 替换为本仓库的克隆地址（HTTPS 或 SSH 均可）
-paseo plugin add git:<repo-url>
+# from GitHub
+paseo plugin add git:CasonMo/paseo-tapd
 
-# 托管在 GitHub 时可用简写
-paseo plugin add git:<owner>/<repo>
+# or from any Git source
+paseo plugin add git:<repo-url>
 ```
 
-安装后在 Settings → Plugins 启用（插件开关需打开），并在插件设置中配置：
+After installing, enable the plugin under Settings → Plugins and configure it:
 
-- API Token：TAPD OpenAPI Token（留空则读取 daemon 环境变量 `TAPD_TOKEN`）
-- 项目 ID：TAPD `workspace_id`（留空则读取 `TAPD_WORKSPACE_IDS`）
+- API Token: TAPD OpenAPI token (falls back to the daemon env var `TAPD_TOKEN`)
+- Project IDs: TAPD `workspace_id` list (falls back to `TAPD_WORKSPACE_IDS`)
 
-设置后可点「测试连接」验证。
+Use "Test connection" in the plugin settings to verify.
 
-## 开发
+## Security
+
+- No credentials are stored in this repository. The token is used only by the daemon-side plugin, as the TAPD `Authorization` header.
+- Prefer environment variables (`TAPD_TOKEN`, `TAPD_WORKSPACE_IDS`). Values saved in the plugin settings are stored as plain JSON on the daemon host.
+- The plugin calls only the TAPD OpenAPI; nothing is sent to any other service.
+
+## Development
 
 ```bash
 npm install
 npm run typecheck
-npm run lint                                       # React Hooks 规则检查（防 #310）
-paseo plugin install /absolute/path/to/this/repo   # 本地目录安装
-paseo plugin reload tapd-workbench                 # 修改后重载
+npm run lint                                       # React Hooks rule check
+paseo plugin install /absolute/path/to/this/repo   # install from a local directory
+paseo plugin reload tapd-workbench                 # reload after edits
 ```
 
-## 安全说明
+## License
 
-- 仓库中不保存任何凭证；Token 仅在 daemon 侧进程中使用，用于调用 TAPD OpenAPI
-- 建议通过环境变量 `TAPD_TOKEN` / `TAPD_WORKSPACE_IDS` 配置
-- 若在插件设置页填写 Token，将以明文 JSON 保存在 daemon 本机（Paseo 插件设置非加密保管库）
+MIT
+
+---
+
+## 中文说明（简版）
+
+TAPD 工作台 Paseo 插件：三栏看板（需求 / 任务 / 缺陷）、可复用视图过滤（内置「我相关的」）、单据详情浮窗、派给 Agent（worktree + agent 关联追踪）、评论与状态回写、单据快照附件源、工作台内直接建单。
+
+安装：`paseo plugin add git:CasonMo/paseo-tapd`（需 Paseo >= 0.11.2），安装后在插件设置中填写 TAPD Token 与项目 ID（或配置环境变量 `TAPD_TOKEN` / `TAPD_WORKSPACE_IDS`）。能力与数据流向的完整说明见 `OVERVIEW.md`。
