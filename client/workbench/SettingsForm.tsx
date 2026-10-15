@@ -110,7 +110,7 @@ function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: W
         <SettingsCard>
           <SettingsInput
             label="API Token"
-            hint="留空则使用 daemon 环境变量 TAPD_TOKEN；填写后以明文保存在 daemon 的插件配置中"
+            hint="留空则使用 daemon 环境变量 TAPD_TOKEN；填写后以明文 JSON 保存在 daemon，可被本机设置页读取"
             placeholder="TAPD OpenAPI Token"
             secureTextEntry
             initialValue={settings.values.token}
