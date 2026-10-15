@@ -7,7 +7,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View, type TextStyle, t
 import { boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
 import { Chip, ToolbarButton } from "./bits";
 import { ColumnPickerModal } from "./ColumnPickerModal";
-import { StatusColumn, type BoardEntityItem } from "./ColumnView";
+import { KindColumn, StatusColumn, type BoardEntityItem } from "./ColumnView";
 import { CreateEntityModal, type CreatedEntity } from "./CreateEntityModal";
 import { DispatchModal } from "./DispatchModal";
 import {
@@ -24,6 +24,8 @@ import { SettingsModal } from "./SettingsForm";
 const KINDS = ["story", "task", "bug"] as const;
 
 const KIND_TITLES: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
+
+type ActiveTab = EntityKind | "all";
 
 function filtersEqual(a: TapdFilters, b: TapdFilters): boolean {
   return (
@@ -52,7 +54,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   const [saveViewOpen, setSaveViewOpen] = useState(false);
   const [newViewName, setNewViewName] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<EntityKind>("story");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("all");
   const [detailVersion, setDetailVersion] = useState(0);
   const [dispatchTarget, setDispatchTarget] = useState<EntityDetailData | null>(null);
   const [commentTarget, setCommentTarget] = useState<EntityDetailData | null>(null);
@@ -163,10 +165,11 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   const activeView = resolveView(readySettings.values, activeViewId ?? "");
   const dirty = filters !== null && !filtersEqual(filters, activeView.filters);
   const emptyText = filters?.statusScope === "active" ? "没有进行中的条目" : "没有条目";
+  const kindTab: EntityKind | null = activeTab === "all" ? null : activeTab;
   const { pickerStatuses, pickerCounts, columns: statusColumns } = buildStatusColumns(
-    board.data?.columns[activeTab]?.items ?? [],
-    optionsQuery.data?.statuses[activeTab] ?? [],
-    readySettings.values.columns[activeTab] ?? null,
+    kindTab ? board.data?.columns[kindTab]?.items ?? [] : [],
+    kindTab ? optionsQuery.data?.statuses[kindTab] ?? [] : [],
+    kindTab ? readySettings.values.columns[kindTab] ?? null : null,
   );
 
   function applyView(view: TapdView) {
@@ -222,6 +225,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   }
 
   async function saveColumns(keys: string[] | null) {
+    if (activeTab === "all") return;
     const values = readySettings.values;
     const next = { ...values.columns };
     if (keys === null) delete next[activeTab];
@@ -296,7 +300,9 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
         {dirty ? <Chip label={`更新「${activeView.name}」`} theme={theme} active onPress={() => void updateActiveView()} /> : null}
         <View style={styles.spacer} />
         {board.data ? <Text style={styles.updated}>更新于 {formatFetchedAt(board.data.fetchedAt)}</Text> : null}
-        <ToolbarButton icon="Columns3" label="列" theme={theme} onPress={() => setColumnsOpen(true)} />
+        {activeTab !== "all" ? (
+          <ToolbarButton icon="Columns3" label="列" theme={theme} onPress={() => setColumnsOpen(true)} />
+        ) : null}
         <ToolbarButton icon="Plus" label="新建" theme={theme} onPress={() => setCreateOpen(true)} />
         <ToolbarButton icon="RefreshCw" label="刷新" theme={theme} busy={board.isFetching} onPress={() => void board.refetch()} />
         <ToolbarButton icon="Settings" theme={theme} onPress={() => setSettingsOpen(true)} />
@@ -322,6 +328,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
       ) : board.data ? (
         <View style={{ flex: 1, gap: 8 }}>
           <View style={styles.tabRow}>
+            <Chip label="聚合" theme={theme} active={activeTab === "all"} onPress={() => setActiveTab("all")} />
             {KINDS.map((kind) => (
               <Chip
                 key={kind}
@@ -332,7 +339,55 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
               />
             ))}
           </View>
-          {statusColumns.length === 0 ? (
+          {activeTab === "all" ? (
+            layout.compact ? (
+              <View style={{ flex: 1 }} onLayout={(event) => setBoardHeight(event.nativeEvent.layout.height)}>
+                <ScrollView
+                  horizontal
+                  style={{ flex: 1 }}
+                  contentContainerStyle={[styles.kanban, boardHeight > 0 ? { height: boardHeight } : null]}
+                >
+                  {KINDS.map((kind) => (
+                    <KindColumn
+                      key={kind}
+                      label={KIND_TITLES[kind]}
+                      items={board.data.columns[kind].items}
+                      total={board.data.columns[kind].total}
+                      truncated={board.data.columns[kind].truncated}
+                      theme={theme}
+                      flex={false}
+                      width={252}
+                      emptyText={emptyText}
+                      favorites={favorites}
+                      linkedKeys={linkedKeys}
+                      onToggleFavorite={(key) => void toggleFavorite(key)}
+                      onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            ) : (
+              <View style={{ flex: 1, flexDirection: "row", gap: 12, minHeight: 0 }}>
+                {KINDS.map((kind) => (
+                  <KindColumn
+                    key={kind}
+                    label={KIND_TITLES[kind]}
+                    items={board.data.columns[kind].items}
+                    total={board.data.columns[kind].total}
+                    truncated={board.data.columns[kind].truncated}
+                    theme={theme}
+                    flex
+                    width={300}
+                    emptyText={emptyText}
+                    favorites={favorites}
+                    linkedKeys={linkedKeys}
+                    onToggleFavorite={(key) => void toggleFavorite(key)}
+                    onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
+                  />
+                ))}
+              </View>
+            )
+          ) : statusColumns.length === 0 ? (
             <View style={styles.center}>
               <Text style={styles.hint}>{emptyText}</Text>
             </View>
@@ -364,16 +419,18 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
         </View>
       ) : null}
 
-      <ColumnPickerModal
-        open={columnsOpen}
-        onClose={() => setColumnsOpen(false)}
-        theme={theme}
-        kind={activeTab}
-        statuses={pickerStatuses}
-        counts={pickerCounts}
-        current={readySettings.values.columns[activeTab] ?? null}
-        onSave={(keys) => void saveColumns(keys)}
-      />
+      {activeTab !== "all" ? (
+        <ColumnPickerModal
+          open={columnsOpen}
+          onClose={() => setColumnsOpen(false)}
+          theme={theme}
+          kind={activeTab}
+          statuses={pickerStatuses}
+          counts={pickerCounts}
+          current={readySettings.values.columns[activeTab] ?? null}
+          onSave={(keys) => void saveColumns(keys)}
+        />
+      ) : null}
       {layout.compact ? (
         <EntityDetailModal target={detail} onClose={() => setDetail(null)} theme={theme} extras={detailExtras} />
       ) : null}
