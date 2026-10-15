@@ -72,6 +72,10 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     retry: 1,
   });
 
+  const handleFiltersChange = useCallback((patch: Partial<TapdFilters>) => {
+    setFilters((current) => (current ? { ...current, ...patch } : current));
+  }, []);
+
   const styles = useMemo<{
     screen: ViewStyle;
     toolbar: ViewStyle;
@@ -154,10 +158,6 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     setActiveViewId(view.id);
     setFilters({ ...view.filters });
   }
-
-  const handleFiltersChange = useCallback((patch: Partial<TapdFilters>) => {
-    setFilters((current) => (current ? { ...current, ...patch } : current));
-  }, []);
 
   function resetFilters() {
     setFilters({ ...activeView.filters });

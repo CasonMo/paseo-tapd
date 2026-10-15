@@ -33,6 +33,7 @@ paseo plugin add git:<repo-url>
 ```bash
 npm install
 npm run typecheck
+npm run lint                                       # React Hooks 规则检查（防 #310）
 paseo plugin install /absolute/path/to/this/repo   # 本地目录安装
 paseo plugin reload tapd-workbench                 # 修改后重载
 ```

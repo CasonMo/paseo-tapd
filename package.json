@@ -12,7 +12,8 @@
     "shared/"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint client index.client.tsx"
   },
   "devDependencies": {
     "@getpaseo/plugin": "0.11.2",
@@ -22,6 +23,9 @@
     "react": "19.1.0",
     "react-native": "0.81.5",
     "typescript": "^5.9.3",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "eslint": "^9.39.0",
+    "eslint-plugin-react-hooks": "^6.0.0",
+    "typescript-eslint": "^8.0.0"
   }
 }
