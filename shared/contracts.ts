@@ -84,8 +84,8 @@ export const tapdSettingsSchema = z.object({
   defaultViewId: z.string().default(""),
   /** 收藏（置顶）单据，键为 `${kind}-${id}` */
   favorites: z.array(z.string()).default([]),
-  /** 列内按状态分组显示 */
-  groupByStatus: z.boolean().default(true),
+  /** 看板各类型显示的状态列（kind -> 状态 key 列表）；未设置或为空 = 自动（仅展示有数据的状态） */
+  columns: z.record(z.string(), z.array(z.string())).default({}),
   /** 单据 ↔ 工作区/Agent 关联（派活记录） */
   links: z.array(
     z.object({
