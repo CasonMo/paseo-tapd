@@ -3,7 +3,7 @@
   "name": "TAPD Workbench",
   "description": "View and work on TAPD stories, tasks, and bugs in Paseo: filter views, agent dispatch, comment and status write-back",
   "media": [
-    "assets/screenshots/workbench.png"
+    "assets/screenshots/workbench-v2.png"
   ],
   "requirements": {
     "paseo": ">=0.11.2"

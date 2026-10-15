@@ -2,7 +2,7 @@
 
 A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo workspace: a three-column board, reusable views, agent dispatch, and comment/status write-back.
 
-![TAPD workbench](assets/screenshots/workbench.png)
+![TAPD workbench](assets/screenshots/workbench-v2.png)
 
 ## Features
 
