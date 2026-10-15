@@ -35,8 +35,10 @@ Use "Test connection" in the plugin settings to verify.
 ## Security
 
 - No credentials are stored in this repository. The token is used only by the daemon-side plugin, as the TAPD `Authorization` header.
-- Prefer environment variables (`TAPD_TOKEN`, `TAPD_WORKSPACE_IDS`). Values saved in the plugin settings are stored as plain JSON on the daemon host.
-- The plugin calls only the TAPD OpenAPI; nothing is sent to any other service.
+- Prefer environment variables (`TAPD_TOKEN`, `TAPD_WORKSPACE_IDS`). A token saved in the plugin settings is stored as plain JSON on the daemon host and is readable by the connected settings interface.
+- The plugin calls only the TAPD OpenAPI. The API base URL and web link base can be overridden per daemon with `TAPD_API_ENDPOINT` and `TAPD_SITE_URL`.
+- Reads cover every configured project. Write operations (comments, status changes, item creation) target the first configured TAPD project.
+- Agent dispatch sends the item snapshot (used as the prompt) to the selected agent provider through the Paseo SDK.
 
 ## Development
 
