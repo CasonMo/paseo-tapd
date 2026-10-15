@@ -4,9 +4,10 @@ import { Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
-import { boardRpc, effectiveViews, resolveView, tapdSettings, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
+import { boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
 import { Chip, ToolbarButton } from "./bits";
-import { ColumnView } from "./ColumnView";
+import { ColumnPickerModal } from "./ColumnPickerModal";
+import { StatusColumn, type BoardEntityItem } from "./ColumnView";
 import { CreateEntityModal, type CreatedEntity } from "./CreateEntityModal";
 import { DispatchModal } from "./DispatchModal";
 import {
@@ -56,6 +57,8 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   const [dispatchTarget, setDispatchTarget] = useState<EntityDetailData | null>(null);
   const [commentTarget, setCommentTarget] = useState<EntityDetailData | null>(null);
   const [statusTarget, setStatusTarget] = useState<EntityDetailData | null>(null);
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [boardHeight, setBoardHeight] = useState(0);
 
   useEffect(() => {
     if (settings.status === "ready" && filters === null) {
@@ -72,6 +75,14 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     retry: 1,
   });
 
+  const fetchOptions = useRpc(filterOptionsRpc);
+  const optionsQuery = useQuery({
+    queryKey: ["tapd-filter-options"],
+    queryFn: () => fetchOptions({}),
+    staleTime: 600_000,
+    retry: 1,
+  });
+
   const handleFiltersChange = useCallback((patch: Partial<TapdFilters>) => {
     setFilters((current) => (current ? { ...current, ...patch } : current));
   }, []);
@@ -80,7 +91,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     screen: ViewStyle;
     toolbar: ViewStyle;
     spacer: ViewStyle;
-    columns: ViewStyle;
+    kanban: ViewStyle;
     center: ViewStyle;
     error: TextStyle;
     hint: TextStyle;
@@ -96,7 +107,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     screen: { flex: 1, backgroundColor: theme.colors.surface0, padding: layout.compact ? 12 : 16, gap: 10 },
     toolbar: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
     spacer: { flex: 1 },
-    columns: { flex: 1, flexDirection: "row", gap: 12, minHeight: 0 },
+    kanban: { gap: 12, paddingBottom: 4 },
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 12 },
     error: { color: theme.colors.statusDanger, fontSize: 13, lineHeight: 19, textAlign: "center" },
     hint: { color: theme.colors.foregroundMuted, fontSize: 12, lineHeight: 18, textAlign: "center" },
@@ -146,13 +157,17 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   // 收窄后的设置句柄，供下方闭包使用（闭包不继承外层控制流收窄）
   const readySettings = settings;
   const favorites = readySettings.values.favorites;
-  const groupByStatus = readySettings.values.groupByStatus;
   const links = readySettings.values.links;
   const linkedKeys = links.map((link) => link.key);
   const views = effectiveViews(readySettings.values);
   const activeView = resolveView(readySettings.values, activeViewId ?? "");
   const dirty = filters !== null && !filtersEqual(filters, activeView.filters);
   const emptyText = filters?.statusScope === "active" ? "没有进行中的条目" : "没有条目";
+  const { pickerStatuses, pickerCounts, columns: statusColumns } = buildStatusColumns(
+    board.data?.columns[activeTab]?.items ?? [],
+    optionsQuery.data?.statuses[activeTab] ?? [],
+    readySettings.values.columns[activeTab] ?? null,
+  );
 
   function applyView(view: TapdView) {
     setActiveViewId(view.id);
@@ -206,12 +221,17 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     if (!ok) toast.error(readySettings.saveError ?? "保存失败，请重试");
   }
 
-  async function toggleGrouped() {
-    const ok = await readySettings.save(
-      { ...readySettings.values, groupByStatus: !readySettings.values.groupByStatus },
-      readySettings.revision,
-    );
-    if (!ok) toast.error(readySettings.saveError ?? "保存失败，请重试");
+  async function saveColumns(keys: string[] | null) {
+    const values = readySettings.values;
+    const next = { ...values.columns };
+    if (keys === null) delete next[activeTab];
+    else next[activeTab] = keys;
+    const ok = await readySettings.save({ ...values, columns: next }, readySettings.revision);
+    if (!ok) {
+      toast.error(readySettings.saveError ?? "保存失败，请重试");
+    } else {
+      setColumnsOpen(false);
+    }
   }
 
   function handleCreated(created: CreatedEntity) {
@@ -276,7 +296,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
         {dirty ? <Chip label={`更新「${activeView.name}」`} theme={theme} active onPress={() => void updateActiveView()} /> : null}
         <View style={styles.spacer} />
         {board.data ? <Text style={styles.updated}>更新于 {formatFetchedAt(board.data.fetchedAt)}</Text> : null}
-        <ToolbarButton icon="Rows3" label="分组" theme={theme} active={groupByStatus} onPress={() => void toggleGrouped()} />
+        <ToolbarButton icon="Columns3" label="列" theme={theme} onPress={() => setColumnsOpen(true)} />
         <ToolbarButton icon="Plus" label="新建" theme={theme} onPress={() => setCreateOpen(true)} />
         <ToolbarButton icon="RefreshCw" label="刷新" theme={theme} busy={board.isFetching} onPress={() => void board.refetch()} />
         <ToolbarButton icon="Settings" theme={theme} onPress={() => setSettingsOpen(true)} />
@@ -300,53 +320,60 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
           <ToolbarButton icon="RefreshCw" label="重试" theme={theme} onPress={() => void board.refetch()} />
         </View>
       ) : board.data ? (
-        layout.compact ? (
-          <View style={{ flex: 1, gap: 8 }}>
-            <View style={styles.tabRow}>
-              {KINDS.map((kind) => (
-                <Chip
-                  key={kind}
-                  label={`${KIND_TITLES[kind]} ${board.data.columns[kind].items.length}`}
-                  theme={theme}
-                  active={activeTab === kind}
-                  onPress={() => setActiveTab(kind)}
-                />
-              ))}
-            </View>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
-              <ColumnView
-                column={board.data.columns[activeTab]}
-                theme={theme}
-                compact
-                grouped={groupByStatus}
-                favorites={favorites}
-                linkedKeys={linkedKeys}
-                onToggleFavorite={(key) => void toggleFavorite(key)}
-                emptyText={emptyText}
-                onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
-              />
-            </ScrollView>
-          </View>
-        ) : (
-          <View style={styles.columns}>
+        <View style={{ flex: 1, gap: 8 }}>
+          <View style={styles.tabRow}>
             {KINDS.map((kind) => (
-              <ColumnView
+              <Chip
                 key={kind}
-                column={board.data.columns[kind]}
+                label={`${KIND_TITLES[kind]} ${board.data.columns[kind].items.length}`}
                 theme={theme}
-                compact={false}
-                grouped={groupByStatus}
-                favorites={favorites}
-                linkedKeys={linkedKeys}
-                onToggleFavorite={(key) => void toggleFavorite(key)}
-                emptyText={emptyText}
-                onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
+                active={activeTab === kind}
+                onPress={() => setActiveTab(kind)}
               />
             ))}
           </View>
-        )
+          {statusColumns.length === 0 ? (
+            <View style={styles.center}>
+              <Text style={styles.hint}>{emptyText}</Text>
+            </View>
+          ) : (
+            <View style={{ flex: 1 }} onLayout={(event) => setBoardHeight(event.nativeEvent.layout.height)}>
+              <ScrollView
+                horizontal
+                style={{ flex: 1 }}
+                contentContainerStyle={[styles.kanban, boardHeight > 0 ? { height: boardHeight } : null]}
+              >
+                {statusColumns.map((column) => (
+                  <StatusColumn
+                    key={column.status}
+                    kind={activeTab}
+                    status={column.status}
+                    label={column.label}
+                    items={column.items}
+                    theme={theme}
+                    width={layout.compact ? 252 : 300}
+                    favorites={favorites}
+                    linkedKeys={linkedKeys}
+                    onToggleFavorite={(key) => void toggleFavorite(key)}
+                    onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </View>
       ) : null}
 
+      <ColumnPickerModal
+        open={columnsOpen}
+        onClose={() => setColumnsOpen(false)}
+        theme={theme}
+        kind={activeTab}
+        statuses={pickerStatuses}
+        counts={pickerCounts}
+        current={readySettings.values.columns[activeTab] ?? null}
+        onSave={(keys) => void saveColumns(keys)}
+      />
       {layout.compact ? (
         <EntityDetailModal target={detail} onClose={() => setDetail(null)} theme={theme} extras={detailExtras} />
       ) : null}
@@ -411,6 +438,46 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
       </Modal>
     </View>
   );
+}
+
+function buildStatusColumns(
+  items: readonly BoardEntityItem[],
+  canonical: readonly { value: string; label: string }[],
+  explicit: readonly string[] | null,
+): {
+  pickerStatuses: { value: string; label: string }[];
+  pickerCounts: Record<string, number>;
+  columns: { status: string; label: string; items: BoardEntityItem[] }[];
+} {
+  const pickerStatuses = canonical.map((status) => ({ value: status.value, label: status.label }));
+  const seen = new Set(pickerStatuses.map((status) => status.value));
+  for (const item of items) {
+    if (!seen.has(item.status)) {
+      seen.add(item.status);
+      pickerStatuses.push({ value: item.status, label: item.statusLabel });
+    }
+  }
+  const pickerCounts: Record<string, number> = {};
+  for (const item of items) {
+    pickerCounts[item.status] = (pickerCounts[item.status] ?? 0) + 1;
+  }
+  const selected =
+    explicit && explicit.length > 0 ? new Set(explicit) : new Set(items.map((item) => item.status));
+  const ordered: string[] = [];
+  const remaining = new Set(selected);
+  for (const status of pickerStatuses) {
+    if (remaining.has(status.value)) {
+      ordered.push(status.value);
+      remaining.delete(status.value);
+    }
+  }
+  for (const value of remaining) ordered.push(value);
+  const columns = ordered.map((status) => ({
+    status,
+    label: pickerStatuses.find((entry) => entry.value === status)?.label ?? status,
+    items: items.filter((item) => item.status === status),
+  }));
+  return { pickerStatuses, pickerCounts, columns };
 }
 
 function formatFetchedAt(iso: string): string {
