@@ -462,7 +462,7 @@ function buildStatusColumns(
     pickerCounts[item.status] = (pickerCounts[item.status] ?? 0) + 1;
   }
   const selected =
-    explicit && explicit.length > 0 ? new Set(explicit) : new Set(items.map((item) => item.status));
+    explicit && explicit.length > 0 ? new Set(explicit) : new Set(pickerStatuses.map((status) => status.value));
   const ordered: string[] = [];
   const remaining = new Set(selected);
   for (const status of pickerStatuses) {
