@@ -1,6 +1,6 @@
 import type { RpcOutput } from "@getpaseo/plugin";
 import { Icon } from "@getpaseo/plugin/client/react-native";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { boardRpc } from "../../shared/contracts";
 import { Chip, formatTime, type WorkbenchTheme } from "./bits";
@@ -135,8 +135,9 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
   );
 }
 
-/** 类型列（聚合 tab）：一列 = 一个单据类型 */
-export function KindColumn({ label, items, total, truncated, theme, flex, width, emptyText, favorites, linkedKeys, onToggleFavorite, onOpen }: {
+/** 类型列（聚合 tab）：一列 = 一个单据类型；支持按状态分组折叠 */
+export function KindColumn({ kind, label, items, total, truncated, theme, flex, width, emptyText, grouped, favorites, linkedKeys, onToggleFavorite, onOpen }: {
+  kind: BoardEntityItem["kind"];
   label: string;
   items: BoardEntityItem[];
   total: number;
@@ -145,14 +146,52 @@ export function KindColumn({ label, items, total, truncated, theme, flex, width,
   flex: boolean;
   width: number;
   emptyText: string;
+  grouped: boolean;
   favorites: readonly string[];
   linkedKeys: readonly string[];
   onToggleFavorite: (key: string) => void;
   onOpen: (entity: BoardEntityItem) => void;
 }) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
   const ordered = useMemo(() => sortPinnedFirst(items, favorites), [items, favorites]);
 
-  const styles = useMemo<{ column: ViewStyle; header: ViewStyle; title: TextStyle; count: TextStyle; list: ViewStyle; empty: TextStyle }>(() => ({
+  const groups = useMemo(() => {
+    if (!grouped) return null;
+    const map = new Map<string, { status: string; label: string; done: boolean; items: BoardEntityItem[] }>();
+    for (const item of ordered) {
+      const existing = map.get(item.status);
+      if (existing) existing.items.push(item);
+      else map.set(item.status, { status: item.status, label: item.statusLabel, done: item.done, items: [item] });
+    }
+    return [...map.values()].sort(
+      (a, b) =>
+        Number(a.done) - Number(b.done) ||
+        b.items.length - a.items.length ||
+        a.label.localeCompare(b.label, "zh-Hans-CN"),
+    );
+  }, [ordered, grouped]);
+
+  function toggleGroup(status: string) {
+    setCollapsed((current) => ({ ...current, [status]: !current[status] }));
+  }
+
+  function renderCard(item: BoardEntityItem) {
+    const key = entityKey(item);
+    return (
+      <EntityCard
+        key={key}
+        entity={item}
+        theme={theme}
+        pinned={favorites.includes(key)}
+        linked={linkedKeys.includes(key)}
+        onTogglePinned={() => onToggleFavorite(key)}
+        onPress={() => onOpen(item)}
+      />
+    );
+  }
+
+  const styles = useMemo<{ column: ViewStyle; header: ViewStyle; title: TextStyle; count: TextStyle; list: ViewStyle; empty: TextStyle; group: ViewStyle; groupHeader: ViewStyle; groupCount: TextStyle }>(() => ({
     column: {
       flex: flex ? 1 : undefined,
       width: flex ? undefined : width,
@@ -169,6 +208,9 @@ export function KindColumn({ label, items, total, truncated, theme, flex, width,
     count: { color: theme.colors.foregroundMuted, fontSize: 12 },
     list: { gap: 8, paddingBottom: 4 },
     empty: { color: theme.colors.foregroundMuted, fontSize: 12, paddingHorizontal: 2, paddingVertical: 6 },
+    group: { gap: 6 },
+    groupHeader: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 2, paddingHorizontal: 2 },
+    groupCount: { color: theme.colors.foregroundMuted, fontSize: 11 },
   }), [theme, flex, width]);
 
   return (
@@ -183,20 +225,31 @@ export function KindColumn({ label, items, total, truncated, theme, flex, width,
         <Text style={styles.empty}>{emptyText}</Text>
       ) : (
         <ScrollView style={{ flex: 1, minHeight: 0 }} contentContainerStyle={styles.list}>
-          {ordered.map((item) => {
-            const key = entityKey(item);
-            return (
-              <EntityCard
-                key={key}
-                entity={item}
-                theme={theme}
-                pinned={favorites.includes(key)}
-                linked={linkedKeys.includes(key)}
-                onTogglePinned={() => onToggleFavorite(key)}
-                onPress={() => onOpen(item)}
-              />
-            );
-          })}
+          {grouped && groups ? (
+            <>
+              {groups.map((group) => (
+                <View key={group.status} style={styles.group}>
+                  <Pressable accessibilityRole="button" style={styles.groupHeader} onPress={() => toggleGroup(group.status)}>
+                    <Icon
+                      name={collapsed[group.status] ? "ChevronRight" : "ChevronDown"}
+                      size={14}
+                      color={theme.colors.foregroundMuted}
+                    />
+                    <Chip
+                      label={group.label}
+                      theme={theme}
+                      tone={statusTone(kind, group.status) === "neutral" ? "muted" : "plain"}
+                      color={toneColor(statusTone(kind, group.status), theme)}
+                    />
+                    <Text style={styles.groupCount}>{group.items.length}</Text>
+                  </Pressable>
+                  {collapsed[group.status] ? null : group.items.map((item) => renderCard(item))}
+                </View>
+              ))}
+            </>
+          ) : (
+            <>{ordered.map((item) => renderCard(item))}</>
+          )}
         </ScrollView>
       )}
     </View>

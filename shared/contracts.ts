@@ -86,6 +86,8 @@ export const tapdSettingsSchema = z.object({
   favorites: z.array(z.string()).default([]),
   /** 看板各类型显示的状态列（kind -> 状态 key 列表）；未设置或为空 = 自动（仅展示有数据的状态） */
   columns: z.record(z.string(), z.array(z.string())).default({}),
+  /** 聚合视图：列内按状态分组（可折叠） */
+  groupByStatus: z.boolean().default(true),
   /** 单据 ↔ 工作区/Agent 关联（派活记录） */
   links: z.array(
     z.object({
