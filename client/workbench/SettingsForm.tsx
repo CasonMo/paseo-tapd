@@ -1,7 +1,6 @@
 import { useRpc, useSettings } from "@getpaseo/plugin/client";
 import type { PluginSurfaceProps, SettingsState } from "@getpaseo/plugin/client";
 import { Modal, useToast } from "@getpaseo/plugin/client/react-native";
-import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import {
@@ -11,7 +10,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "@getpaseo/plugin/client/ui";
-import { checkRpc, skillInstallRpc, skillStatusRpc, skillUninstallRpc, tapdSettings } from "../../shared/contracts";
+import { checkRpc, tapdSettings } from "../../shared/contracts";
 import type { WorkbenchTheme } from "./bits";
 import { ViewsSection, type ReadySettings } from "./ViewsSection";
 
@@ -72,37 +71,8 @@ function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: W
   const [workspaceIds, setWorkspaceIds] = useState(settings.values.workspaceIds);
   const [checkState, setCheckState] = useState<{ ok: boolean; message: string } | null>(null);
   const [testing, setTesting] = useState(false);
-  const [skillBusy, setSkillBusy] = useState(false);
   const toast = useToast();
   const check = useRpc(checkRpc);
-  const fetchSkillStatus = useRpc(skillStatusRpc);
-  const installSkillAction = useRpc(skillInstallRpc);
-  const uninstallSkillAction = useRpc(skillUninstallRpc);
-  const skillQuery = useQuery({
-    queryKey: ["tapd-skill-status"],
-    queryFn: () => fetchSkillStatus({}),
-    staleTime: 10_000,
-    retry: 1,
-  });
-
-  async function runSkillAction(action: "install" | "uninstall") {
-    if (skillBusy) return;
-    setSkillBusy(true);
-    try {
-      if (action === "install") {
-        const result = await installSkillAction({});
-        toast.show(`已安装技能（${result.files} 个文件）→ ${result.path}`, { variant: "success" });
-      } else {
-        await uninstallSkillAction({});
-        toast.show("已卸载技能", { variant: "success" });
-      }
-      void skillQuery.refetch();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSkillBusy(false);
-    }
-  }
 
   async function save() {
     const ok = await settings.save(
@@ -134,31 +104,6 @@ function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: W
     fontSize: 12,
   }), [theme, checkState?.ok]);
 
-  const skillState = skillQuery.data?.state;
-  const skillInstalled = skillState === "current" || skillState === "stale";
-  const skillStateText = skillQuery.isError
-    ? "状态未知"
-    : skillState === "current"
-      ? "已安装（最新）"
-      : skillState === "stale"
-        ? "已安装（有更新，点“更新”即可）"
-        : skillState === "missing"
-          ? "未安装"
-          : "读取中…";
-  const skillStateStyle = useMemo<TextStyle>(() => ({
-    color:
-      skillState === "current"
-        ? theme.colors.statusSuccess
-        : skillState === "stale"
-          ? theme.colors.statusWarning
-          : skillState === undefined
-            ? theme.colors.foregroundMuted
-            : skillQuery.isError
-              ? theme.colors.statusDanger
-              : theme.colors.foregroundMuted,
-    fontSize: 12,
-  }), [theme, skillState, skillQuery.isError]);
-
   return (
     <View style={{ gap: 16 }}>
       <SettingsSection title="连接">
@@ -181,30 +126,6 @@ function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: W
         </SettingsCard>
       </SettingsSection>
       <ViewsSection theme={theme} settings={settings} />
-      <SettingsSection title="Agent 技能">
-        <SettingsCard>
-          <SettingsRow
-            label="TAPD 技能（paseo-tapd）"
-            hint="安装到本机 ~/.agents/skills/paseo-tapd；Claude Code / Codex / Pi 等读取该目录的 Agent 即可直接使用"
-          >
-            <Text style={skillStateStyle}>{skillStateText}</Text>
-          </SettingsRow>
-          <SettingsAction
-            label={skillInstalled ? "更新技能" : "安装技能"}
-            actionLabel={skillBusy ? "处理中…" : skillInstalled ? "更新" : "安装"}
-            disabled={skillBusy}
-            onPress={() => void runSkillAction("install")}
-          />
-          {skillInstalled ? (
-            <SettingsAction
-              label="卸载技能"
-              actionLabel="卸载"
-              disabled={skillBusy}
-              onPress={() => void runSkillAction("uninstall")}
-            />
-          ) : null}
-        </SettingsCard>
-      </SettingsSection>
       <SettingsSection title="操作">
         <SettingsCard>
           <SettingsAction

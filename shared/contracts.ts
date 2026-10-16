@@ -305,28 +305,6 @@ export const createRpc = defineRpc({
   }),
 });
 
-export const skillStatusRpc = defineRpc({
-  name: "tapd.skill_status",
-  input: z.object({}),
-  output: z.object({
-    state: z.enum(["missing", "current", "stale"]),
-    path: z.string(),
-    totalFiles: z.number(),
-  }),
-});
-
-export const skillInstallRpc = defineRpc({
-  name: "tapd.skill_install",
-  input: z.object({}),
-  output: z.object({ ok: z.boolean(), path: z.string(), files: z.number() }),
-});
-
-export const skillUninstallRpc = defineRpc({
-  name: "tapd.skill_uninstall",
-  input: z.object({}),
-  output: z.object({ ok: z.boolean(), path: z.string() }),
-});
-
 export const updateStatusRpc = defineRpc({
   name: "tapd.update_status",
   input: z.object({ kind: entityKindSchema, id: z.string(), status: z.string() }),
