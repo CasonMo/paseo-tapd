@@ -12,8 +12,7 @@ A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo works
 - Dispatch to an agent: pick a repository and provider/model; the plugin creates a worktree workspace and starts an agent preloaded with the item snapshot, then tracks it from the card
 - Write back to TAPD: comments (plain text converted to HTML), workflow status changes, and new item creation
 - Attachment source: search TAPD items while composing a prompt and attach a snapshot
-- Reverse binding: talk in any agent, then bind the conversation to a TAPD item; the item detail can also link to an existing agent, and the bound agent receives a short follow-up notice
-- Agent binding: link a conversation to a TAPD item from the workbench or with /paseo-tapd; agent sessions receive the TAPD environment variables (when not already defined), so a linked agent can query and update TAPD
+- Agent binding: pick an agent from the item detail window to link it to the item; the bound agent receives a short follow-up notice with the item snapshot, and agent sessions receive the TAPD environment variables (when not already defined) so a linked agent can query and update TAPD
 
 ## Install
 
@@ -34,23 +33,9 @@ After installing, enable the plugin under Settings → Plugins and configure it:
 
 Use "Test connection" in the plugin settings to verify.
 
-## TAPD commands from any agent (`/paseo-tapd`)
-
-From any agent conversation:
-
-```text
-/paseo-tapd 登记排查任务到 https://www.tapd.cn/tapd_fe/<project>/story/detail/<id>
-/paseo-tapd 登记缺陷到需求 <需求ID>
-/paseo-tapd 创建需求 登录页优化，并建跟进任务
-/paseo-tapd 查询我进行中的缺陷
-/paseo-tapd 绑定 <单据ID或关键词>      # bind this session to an item (plugin flow)
-```
-
-Most requests are handed to the running agent with inline TAPD OpenAPI instructions: the agent identifies the item type from its link or ID, asks for missing details (for example which story a task belongs to), chains multi-step operations (create a story, then a task under it), and reports back with links. When a request references a specific item (a TAPD link or a 10+ digit ID), the plugin binds the conversation to that item before handing the request over. Requests starting with `绑定` / `关联` open the plugin's bind picker instead; the item detail can also link to an existing agent. After binding, the agent receives a short notice message containing the item snapshot.
-
 ## Agent binding
 
-Link TAPD items and agent conversations from either side: use `/paseo-tapd 绑定 <ID or keyword>` in a conversation, or pick an agent from the item detail window. Requests sent through `/paseo-tapd` are handed to the running agent with inline TAPD OpenAPI instructions, and agent sessions receive the TAPD connection variables when they are not already defined.
+Pick an agent from the item detail window to link the item to that conversation. The bound agent receives a short follow-up notice with the item snapshot, and agent sessions receive the TAPD connection variables when they are not already defined so the agent can query and update TAPD.
 
 ## Security
 
@@ -80,4 +65,4 @@ MIT
 
 TAPD 工作台 Paseo 插件：聚合（三栏并排，按状态分组可折叠）+ 需求/任务/缺陷 tab，按状态分列看板（列可自选）、可复用视图过滤（内置「我相关的」）、单据详情浮窗、派给 Agent（worktree + agent 关联追踪）、评论与状态回写、单据快照附件源、工作台内直接建单。
 
-安装：`paseo plugin add git:CasonMo/paseo-tapd`（需 Paseo >= 0.11.2），安装后在插件设置中填写 TAPD Token 与项目 ID（或配置环境变量 `TAPD_TOKEN` / `TAPD_WORKSPACE_IDS`）。支持反向绑定：在任意 Agent 会话里 `/paseo-tapd <ID或关键词>` 绑定单据、`/paseo-tapd 创建需求 <标题>` 建单并绑定；绑定后自动给该 Agent 发送跟进提示词，并为其注入 TAPD 环境变量以便直接调用 OpenAPI。能力与数据流向的完整说明见 `OVERVIEW.md`。
+安装：`paseo plugin add git:CasonMo/paseo-tapd`（需 Paseo >= 0.11.2），安装后在插件设置中填写 TAPD Token 与项目 ID（或配置环境变量 `TAPD_TOKEN` / `TAPD_WORKSPACE_IDS`）。支持绑定 Agent：在单据详情浮窗里把单据关联到一个已有 Agent；绑定后自动给该 Agent 发送跟进提示词，并为其注入 TAPD 环境变量以便直接调用 OpenAPI。能力与数据流向的完整说明见 `OVERVIEW.md`。
