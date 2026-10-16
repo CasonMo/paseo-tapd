@@ -1,5 +1,5 @@
 import type { PluginServerContext } from "@getpaseo/plugin/server";
-import { addCommentRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, tapdSettings, updateStatusRpc } from "./shared/contracts";
+import { addCommentRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, tapdSettings, updateCheckRpc, updateStatusRpc } from "./shared/contracts";
 import { createHandlers } from "./server/handlers";
 import { clearTapdCache } from "./server/tapd";
 
@@ -22,6 +22,7 @@ export default function contribute(server: PluginServerContext) {
   server.handle(filterOptionsRpc, handlers.filterOptions);
   server.handle(filterFieldsRpc, handlers.filterFields);
   server.handle(checkRpc, handlers.check);
+  server.handle(updateCheckRpc, handlers.updateCheck);
 
   const unsubscribe = settings.subscribe(() => {
     clearTapdCache();
