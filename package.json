@@ -1,0 +1,38 @@
+{
+  "name": "tapd-workbench",
+  "private": true,
+  "version": "0.4.2",
+  "files": [
+    "LICENSE",
+    "README.md",
+    "paseo-plugin.json",
+    "OVERVIEW.md",
+    "index.client.tsx",
+    "index.server.ts",
+    "client/",
+    "server/",
+    "shared/",
+    "assets/",
+    "skill/"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint client index.client.tsx",
+    "build:skill": "node scripts/build-skill-embed.mjs"
+  },
+  "devDependencies": {
+    "@getpaseo/plugin": "0.11.2",
+    "@tanstack/react-query": "^5.90.11",
+    "@types/node": "^24.0.0",
+    "@types/react": "~19.2.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3",
+    "eslint": "^9.39.0",
+    "eslint-plugin-react-hooks": "^6.0.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "description": "Paseo plugin: TAPD workbench (filter views, agent dispatch, comment and status write-back)",
+  "license": "MIT"
+}

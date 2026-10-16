@@ -1,0 +1,66 @@
+import type { EntityKind, TapdLink } from "../../shared/contracts";
+
+export const KIND_LABELS: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
+
+/** 解析搜索结果的 id（格式 `kind-id`） */
+export function parseEntityRef(value: string): { kind: EntityKind; id: string } | null {
+  const separator = value.indexOf("-");
+  if (separator <= 0) return null;
+  const kind = value.slice(0, separator);
+  const id = value.slice(separator + 1);
+  if ((kind !== "story" && kind !== "task" && kind !== "bug") || !id) return null;
+  return { kind, id };
+}
+
+export function makeLink(input: {
+  kind: EntityKind;
+  id: string;
+  workspaceId: string;
+  agentId: string;
+  agentTitle: string;
+  workspaceTitle?: string;
+}): TapdLink {
+  return {
+    key: `${input.kind}-${input.id}`,
+    kind: input.kind,
+    id: input.id,
+    workspaceId: input.workspaceId,
+    agentId: input.agentId,
+    workspaceTitle: input.workspaceTitle ?? "",
+    agentTitle: input.agentTitle,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/** 绑定后发给 Agent 的跟进提示词 */
+export function bindNoticeText(input: {
+  kind: EntityKind;
+  id: string;
+  title: string;
+  statusLabel?: string | null;
+  url: string;
+}): string {
+  const status = input.statusLabel ? `（当前状态：${input.statusLabel}）` : "";
+  return [
+    `【TAPD 关联】本会话已与 TAPD ${KIND_LABELS[input.kind]} #${input.id}「${input.title}」建立关联${status}。`,
+    `链接：${input.url}`,
+    "后续请围绕这张单据跟进；完成阶段性工作后，可在 Paseo 的「TAPD 工作台」将结论回写到单据评论或更新状态。",
+  ].join("\n");
+}
+
+interface AgentSender {
+  agents: {
+    ref(agentOrId: string): { send(text: string): Promise<unknown> };
+  };
+}
+
+/** 发送关联提示词（失败不阻断绑定） */
+export async function notifyAgent(paseo: AgentSender, agentId: string, text: string): Promise<boolean> {
+  if (!agentId) return false;
+  try {
+    await paseo.agents.ref(agentId).send(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
