@@ -12,6 +12,7 @@ A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo works
 - Dispatch to an agent: pick a repository and provider/model; the plugin creates a worktree workspace and starts an agent preloaded with the item snapshot, then tracks it from the card
 - Write back to TAPD: comments (plain text converted to HTML), workflow status changes, and new item creation
 - Attachment source: search TAPD items while composing a prompt and attach a snapshot
+- Reverse binding: talk in any agent, then bind the conversation to a TAPD item; the item detail can also link to an existing agent, and the bound agent receives a short follow-up notice
 
 ## Install
 
@@ -31,6 +32,18 @@ After installing, enable the plugin under Settings → Plugins and configure it:
 - Project IDs: TAPD `workspace_id` list (falls back to `TAPD_WORKSPACE_IDS`)
 
 Use "Test connection" in the plugin settings to verify.
+
+## Linking an agent to a TAPD item
+
+From any agent conversation:
+
+```text
+/paseo-tapd 1112345678001088076      # bind by item ID
+/paseo-tapd 登录页优化                # search and bind (no match offers to create a story)
+/paseo-tapd 创建需求 跟进登录页优化   # create a story and bind it
+```
+
+Or open the item in the TAPD workbench and use "绑定 Agent" to link it to an existing agent. After binding, the agent receives a short notice message containing the item snapshot.
 
 ## Security
 
@@ -60,4 +73,4 @@ MIT
 
 TAPD 工作台 Paseo 插件：聚合（三栏并排，按状态分组可折叠）+ 需求/任务/缺陷 tab，按状态分列看板（列可自选）、可复用视图过滤（内置「我相关的」）、单据详情浮窗、派给 Agent（worktree + agent 关联追踪）、评论与状态回写、单据快照附件源、工作台内直接建单。
 
-安装：`paseo plugin add git:CasonMo/paseo-tapd`（需 Paseo >= 0.11.2），安装后在插件设置中填写 TAPD Token 与项目 ID（或配置环境变量 `TAPD_TOKEN` / `TAPD_WORKSPACE_IDS`）。能力与数据流向的完整说明见 `OVERVIEW.md`。
+安装：`paseo plugin add git:CasonMo/paseo-tapd`（需 Paseo >= 0.11.2），安装后在插件设置中填写 TAPD Token 与项目 ID（或配置环境变量 `TAPD_TOKEN` / `TAPD_WORKSPACE_IDS`）。支持反向绑定：在任意 Agent 会话里 `/paseo-tapd <ID或关键词>` 绑定单据、`/paseo-tapd 创建需求 <标题>` 建单并绑定；绑定后自动给该 Agent 发送跟进提示词。能力与数据流向的完整说明见 `OVERVIEW.md`。
