@@ -111,6 +111,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     hint: TextStyle;
     updated: TextStyle;
     tabRow: ViewStyle;
+    errorBanner: TextStyle;
     modalInput: TextStyle;
     modalActions: ViewStyle;
     primaryButton: ViewStyle;
@@ -127,6 +128,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     hint: { color: theme.colors.foregroundMuted, fontSize: 12, lineHeight: 18, textAlign: "center" },
     updated: { color: theme.colors.foregroundMuted, fontSize: 11 },
     tabRow: { flexDirection: "row", gap: 8 },
+    errorBanner: { color: theme.colors.statusDanger, fontSize: 12, lineHeight: 18 },
     modalInput: {
       backgroundColor: theme.colors.surface2,
       borderColor: theme.colors.border,
@@ -383,6 +385,11 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
               />
             ))}
           </View>
+          {KINDS.filter((kind) => board.data.columns[kind].error).map((kind) => (
+            <Text key={kind} style={styles.errorBanner}>
+              {KIND_TITLES[kind]}加载失败：{board.data.columns[kind].error}
+            </Text>
+          ))}
           {activeTab === "all" ? (
             layout.compact ? (
               <View style={{ flex: 1 }} onLayout={(event) => setBoardHeight(event.nativeEvent.layout.height)}>

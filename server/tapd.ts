@@ -844,6 +844,7 @@ function buildDimensionParams(
     label: options.label || undefined,
   };
   if (kind === "bug" && options.severities.length > 0) params.severity = options.severities.join("|");
+  if (options.creator) params[kind === "bug" ? "reporter" : "creator"] = options.creator;
   if (options.keyword) params[kind === "bug" ? "title" : "name"] = options.keyword;
   return params;
 }
