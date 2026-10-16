@@ -34,17 +34,18 @@ After installing, enable the plugin under Settings → Plugins and configure it:
 
 Use "Test connection" in the plugin settings to verify.
 
-## Linking an agent to a TAPD item
+## TAPD commands from any agent (`/paseo-tapd`)
 
 From any agent conversation:
 
 ```text
-/paseo-tapd 1112345678001088076      # bind by item ID
-/paseo-tapd 登录页优化                # search and bind (no match offers to create a story)
-/paseo-tapd 创建需求 跟进登录页优化   # create a story and bind it
+/paseo-tapd 登记排查任务到 https://www.tapd.cn/tapd_fe/<project>/story/detail/<id>
+/paseo-tapd 创建需求 登录页优化，并建跟进任务
+/paseo-tapd 查询我进行中的缺陷
+/paseo-tapd 绑定 1112345678001088076      # bind this session to an item (plugin flow)
 ```
 
-Or open the item in the TAPD workbench and use "绑定 Agent" to link it to an existing agent. After binding, the agent receives a short notice message containing the item snapshot.
+Most requests are handed to the running agent with inline TAPD OpenAPI instructions: the agent identifies the item type from its link or ID, asks for missing details (for example which story a task belongs to), chains multi-step operations (create a story, then a task under it), and reports back with links. Requests starting with `绑定` / `关联` open the plugin's bind picker instead; the item detail can also link to an existing agent. After binding, the agent receives a short notice message containing the item snapshot.
 
 ## Agent skill (paseo-tapd)
 

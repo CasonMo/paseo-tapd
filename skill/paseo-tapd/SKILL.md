@@ -85,6 +85,29 @@ curl -s -X POST -H "Authorization: Bearer $TAPD_TOKEN" \
   "$API/stories"
 ```
 
+## 常见工作流
+
+### 登记任务（排查/开发任务）到需求
+1. 用链接/ID 确认目标需求：`GET /stories?workspace_id=$WS&id=<需求ID>`；
+2. 创建任务并关联需求（**story_id 必传**）：
+```bash
+curl -s -X POST -H "Authorization: Bearer $TAPD_TOKEN" \
+  --data-urlencode "workspace_id=$WS" \
+  --data-urlencode "name=<任务标题>" \
+  --data-urlencode "story_id=<需求ID>" \
+  --data-urlencode "owner=<处理人昵称>" \
+  --data-urlencode "description=<p>背景说明</p>" \
+  "$API/tasks"
+```
+3. 若目标不是需求：先询问用户是否创建需求，得到确认后**连续**创建 需求 → 任务；
+4. 未指定归属需求：先问用户登记到哪个需求（可先搜索给候选）。
+
+### 创建需求并跟进任务（连续执行）
+`POST /stories` 创建需求 → 用返回的 `Story.id` 作为 `story_id` 创建任务，一次完成，不要反复确认。
+
+### 汇报与写回
+完成后把阶段性结论写成评论（见「写评论」），并把单据链接贴给用户。
+
 ## 与 Paseo「TAPD 工作台」插件的配合
 
 - 用户装了该插件时，查看/派发/回写可以直接在插件 UI 完成；本技能适合在对话里快速查单。
