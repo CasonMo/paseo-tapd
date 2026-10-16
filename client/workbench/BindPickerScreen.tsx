@@ -186,7 +186,7 @@ function BindPickerBody({ theme, params }: { theme: WorkbenchTheme; params: Reco
       </Text>
       <TextInput
         style={styles.input}
-        placeholder="输入关键词或单据 ID，例如：登录页优化 / 1112345678001088076"
+        placeholder="输入关键词或单据 ID，例如：登录页优化 / 1234567890123456789"
         placeholderTextColor={theme.colors.foregroundMuted}
         value={query}
         onChangeText={setQuery}
