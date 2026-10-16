@@ -6,9 +6,9 @@ Opening an item shows status, owner, creator, iteration, description, and recent
 
 Workflow features: dispatch an item to a coding agent by picking a repository and provider/model; the plugin creates a worktree workspace and starts an agent whose prompt contains the item snapshot. Dispatched workspaces and agents are tracked from the item and the card. The plugin can write a comment back to TAPD (plain text converted to HTML), change the item's workflow status, and create new stories, tasks, or bugs from the board.
 
-An agent conversation can also be linked back to an item. The /paseo-tapd slash command in an agent conversation hands the request to that agent with inline TAPD OpenAPI instructions, so it can look up items by link or ID, register a follow-up task under a story, create a story and its task in one go, write back comments, and ask for missing details such as the owning story. Binding the conversation to an item is a plugin action: /paseo-tapd 绑定 <id or keyword>, or the picker in the item detail; requests that reference a specific item bind the conversation to it automatically. The item detail window can link the item to an existing agent instead. After binding, the agent receives a short notice message with the item snapshot, and the link is tracked on the card and in the detail window.
+An item can also be linked to an existing agent from the item detail window. After binding, the agent receives a short notice message with the item snapshot, and the link is tracked on the card and in the detail window.
 
-Agent sessions receive the TAPD connection variables (TAPD_TOKEN, TAPD_API_ENDPOINT, TAPD_SITE_URL, TAPD_WORKSPACE_IDS) when they are not already defined, so the /paseo-tapd flow can call the TAPD OpenAPI directly.
+Agent sessions receive the TAPD connection variables (TAPD_TOKEN, TAPD_API_ENDPOINT, TAPD_SITE_URL, TAPD_WORKSPACE_IDS) when they are not already defined, so a linked agent can call the TAPD OpenAPI directly.
 
 An attachment source lets you search TAPD items by keyword or ID while composing a prompt and attach a text snapshot (title, status, owner, link).
 

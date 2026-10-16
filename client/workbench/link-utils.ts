@@ -2,16 +2,6 @@ import type { EntityKind, TapdLink } from "../../shared/contracts";
 
 export const KIND_LABELS: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
 
-/** 解析搜索结果的 id（格式 `kind-id`） */
-export function parseEntityRef(value: string): { kind: EntityKind; id: string } | null {
-  const separator = value.indexOf("-");
-  if (separator <= 0) return null;
-  const kind = value.slice(0, separator);
-  const id = value.slice(separator + 1);
-  if ((kind !== "story" && kind !== "task" && kind !== "bug") || !id) return null;
-  return { kind, id };
-}
-
 export function makeLink(input: {
   kind: EntityKind;
   id: string;
