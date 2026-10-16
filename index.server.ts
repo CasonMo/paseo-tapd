@@ -1,5 +1,5 @@
 import type { PluginServerContext } from "@getpaseo/plugin/server";
-import { addCommentRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, tapdSettings, updateStatusRpc } from "./shared/contracts";
+import { addCommentRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, skillInstallRpc, skillStatusRpc, skillUninstallRpc, tapdSettings, updateStatusRpc } from "./shared/contracts";
 import { createHandlers } from "./server/handlers";
 import { clearTapdCache } from "./server/tapd";
 
@@ -17,6 +17,9 @@ export default function contribute(server: PluginServerContext) {
   server.handle(createRpc, handlers.create);
   server.handle(updateStatusRpc, handlers.updateStatus);
   server.handle(addCommentRpc, handlers.addComment);
+  server.handle(skillStatusRpc, handlers.skillStatus);
+  server.handle(skillInstallRpc, handlers.skillInstall);
+  server.handle(skillUninstallRpc, handlers.skillUninstall);
   server.handle(entityRpc, handlers.entity);
   server.handle(searchRpc, handlers.search);
   server.handle(filterOptionsRpc, handlers.filterOptions);
@@ -25,6 +28,29 @@ export default function contribute(server: PluginServerContext) {
 
   const unsubscribe = settings.subscribe(() => {
     clearTapdCache();
+  });
+
+  // 给每个 agent 会话注入 TAPD 环境变量（不覆盖已有同名变量），使 paseo-tapd 技能开箱可用
+  server.before("agent.session_open", async ({ request }) => {
+    let values: { token: string; workspaceIds: string } | null = null;
+    try {
+      const state = await settings.read();
+      if (state.status === "ready") values = state.values;
+    } catch {
+      values = null;
+    }
+    const token = (values?.token ?? "").trim() || (process.env.TAPD_TOKEN ?? "").trim();
+    const endpoint = (process.env.TAPD_API_ENDPOINT ?? "").trim();
+    const site = (process.env.TAPD_SITE_URL ?? "").trim();
+    const workspaces =
+      ((values?.workspaceIds ?? "").trim() || (process.env.TAPD_WORKSPACE_IDS ?? "").trim());
+    if (!token && !endpoint && !site && !workspaces) return request;
+    const env: Record<string, string> = { ...(request.env ?? {}) };
+    if (token && !env.TAPD_TOKEN) env.TAPD_TOKEN = token;
+    if (endpoint && !env.TAPD_API_ENDPOINT) env.TAPD_API_ENDPOINT = endpoint;
+    if (site && !env.TAPD_SITE_URL) env.TAPD_SITE_URL = site;
+    if (workspaces && !env.TAPD_WORKSPACE_IDS) env.TAPD_WORKSPACE_IDS = workspaces;
+    return { ...request, env };
   });
 
   console.log("[tapd-workbench] server ready");
