@@ -40,12 +40,13 @@ From any agent conversation:
 
 ```text
 /paseo-tapd 登记排查任务到 https://www.tapd.cn/tapd_fe/<project>/story/detail/<id>
+/paseo-tapd 登记缺陷到需求 <需求ID>
 /paseo-tapd 创建需求 登录页优化，并建跟进任务
 /paseo-tapd 查询我进行中的缺陷
 /paseo-tapd 绑定 1112345678001088076      # bind this session to an item (plugin flow)
 ```
 
-Most requests are handed to the running agent with inline TAPD OpenAPI instructions: the agent identifies the item type from its link or ID, asks for missing details (for example which story a task belongs to), chains multi-step operations (create a story, then a task under it), and reports back with links. Requests starting with `绑定` / `关联` open the plugin's bind picker instead; the item detail can also link to an existing agent. After binding, the agent receives a short notice message containing the item snapshot.
+Most requests are handed to the running agent with inline TAPD OpenAPI instructions: the agent identifies the item type from its link or ID, asks for missing details (for example which story a task belongs to), chains multi-step operations (create a story, then a task under it), and reports back with links. When a request references a specific item (a TAPD link or a 10+ digit ID), the plugin binds the conversation to that item before handing the request over. Requests starting with `绑定` / `关联` open the plugin's bind picker instead; the item detail can also link to an existing agent. After binding, the agent receives a short notice message containing the item snapshot.
 
 ## Agent skill (paseo-tapd)
 

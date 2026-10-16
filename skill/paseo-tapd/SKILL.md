@@ -105,6 +105,11 @@ curl -s -X POST -H "Authorization: Bearer $TAPD_TOKEN" \
 ### 创建需求并跟进任务（连续执行）
 `POST /stories` 创建需求 → 用返回的 `Story.id` 作为 `story_id` 创建任务，一次完成，不要反复确认。
 
+### 登记缺陷并关联需求
+1. 创建缺陷：`POST /bugs`（workspace_id, title, description?）；
+2. 关联到需求：`POST /relations`（workspace_id, source_type=bug, source_id=<缺陷ID>, target_type=story, target_id=<需求ID>）；
+3. 未指定关联需求：先问用户要关联到哪个需求（可先搜索给候选）；用户明确不关联则跳过第 2 步。
+
 ### 汇报与写回
 完成后把阶段性结论写成评论（见「写评论」），并把单据链接贴给用户。
 
