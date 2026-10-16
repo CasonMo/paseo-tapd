@@ -4,7 +4,7 @@ import { Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
-import { boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
+import { boardRpc, effectiveViews, filterOptionsRpc, resolveView, skillInstallRpc, skillStatusRpc, tapdSettings, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
 import { Chip, ToolbarButton } from "./bits";
 import { BindAgentModal } from "./BindAgentModal";
 import { ColumnPickerModal } from "./ColumnPickerModal";
@@ -63,6 +63,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   const [bindTarget, setBindTarget] = useState<EntityDetailData | null>(null);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [boardHeight, setBoardHeight] = useState(0);
+  const [skillBusy, setSkillBusy] = useState(false);
 
   useEffect(() => {
     if (settings.status === "ready" && filters === null) {
@@ -76,6 +77,15 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     queryFn: () => rpc({ filters: filters ?? undefined }),
     enabled: filters !== null,
     staleTime: 30_000,
+    retry: 1,
+  });
+
+  const fetchSkillStatus = useRpc(skillStatusRpc);
+  const installSkillAction = useRpc(skillInstallRpc);
+  const skillQuery = useQuery({
+    queryKey: ["tapd-skill-status"],
+    queryFn: () => fetchSkillStatus({}),
+    staleTime: 10_000,
     retry: 1,
   });
 
@@ -227,6 +237,24 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     if (!ok) toast.error(readySettings.saveError ?? "保存失败，请重试");
   }
 
+  async function installSkillFromBoard() {
+    if (skillBusy) return;
+    if (skillQuery.data?.state === "current") {
+      toast.show("技能已是最新（~/.agents/skills/paseo-tapd）", { variant: "info" });
+      return;
+    }
+    setSkillBusy(true);
+    try {
+      const result = await installSkillAction({});
+      toast.show(`已安装到 ${result.path}`, { variant: "success" });
+      void skillQuery.refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSkillBusy(false);
+    }
+  }
+
   async function toggleGrouped() {
     const ok = await readySettings.save(
       { ...readySettings.values, groupByStatus: !readySettings.values.groupByStatus },
@@ -319,6 +347,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
           <ToolbarButton icon="Rows3" label="分组" theme={theme} active={groupByStatus} onPress={() => void toggleGrouped()} />
         ) : null}
         <ToolbarButton icon="Plus" label="新建" theme={theme} onPress={() => setCreateOpen(true)} />
+        <ToolbarButton icon="Puzzle" label="技能" theme={theme} busy={skillBusy} onPress={() => void installSkillFromBoard()} />
         <ToolbarButton icon="RefreshCw" label="刷新" theme={theme} busy={board.isFetching} onPress={() => void board.refetch()} />
         <ToolbarButton icon="Settings" theme={theme} onPress={() => setSettingsOpen(true)} />
       </View>

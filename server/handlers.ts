@@ -1,5 +1,5 @@
 import type { RpcInput, RpcOutput } from "@getpaseo/plugin";
-import type { addCommentRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, updateStatusRpc } from "../shared/contracts";
+import type { addCommentRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, skillInstallRpc, skillStatusRpc, skillUninstallRpc, updateStatusRpc } from "../shared/contracts";
 import { DEFAULT_FILTERS, type EntityKind, type TapdSettingsValues } from "../shared/contracts";
 import {
   addComment,
@@ -19,6 +19,7 @@ import {
   type ColumnQueryOptions,
   type TapdConfig,
 } from "./tapd";
+import { getSkillStatus, installSkill, uninstallSkill } from "./skill";
 
 type GetValues = () => Promise<TapdSettingsValues>;
 
@@ -119,6 +120,20 @@ export function createHandlers(getValues: GetValues) {
         priority: input.priority,
         iterationId: input.iterationId,
       });
+    },
+
+    async skillStatus(): Promise<RpcOutput<typeof skillStatusRpc>> {
+      return getSkillStatus();
+    },
+
+    async skillInstall(): Promise<RpcOutput<typeof skillInstallRpc>> {
+      const result = await installSkill();
+      return { ok: true, path: result.path, files: result.files };
+    },
+
+    async skillUninstall(): Promise<RpcOutput<typeof skillUninstallRpc>> {
+      const result = await uninstallSkill();
+      return { ok: true, path: result.path };
     },
 
     async updateStatus(input: RpcInput<typeof updateStatusRpc>): Promise<RpcOutput<typeof updateStatusRpc>> {
