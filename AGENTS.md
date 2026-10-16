@@ -51,11 +51,33 @@ Paseo plugin requirements we must follow when developing, reviewing, and releasi
   or raw request bodies.
 - When behavior or data access changes, update `OVERVIEW.md` in the same change.
 
-## Release checklist
+## Keeping docs in sync
+
+Feature changes must update the user-facing documents in the same change:
+
+- `README.md`: feature list, setup, and usage examples.
+- `OVERVIEW.md`: capabilities, settings, permissions, and data access.
+- `paseo-plugin.json`: description, media, icon, and requirements.
+
+A release is not ready while these documents still describe older behavior.
+
+## Publishing and releases
+
+The registry at https://github.com/getpaseo/plugins pins one exact commit of this
+repository, and that pinned artifact is what users install.
+
+1. Push the finished change to `main` after the checklist below passes.
+2. Request the update in the registry: open a submission issue (title = the plugin
+   name, Source = this repository) naming the desired commit, or propose the new
+   commit directly in the existing record with a hand-edited pull request. Git
+   updates are manual; nothing is bumped automatically.
+3. The reviewer verifies the pinned commit, runs the trusted registry validation,
+   and merges. Approved listings appear on paseo.sh/plugins; no tag is required.
+4. After merge, confirm the listing installs the new pin.
+
+Checklist before pushing:
 
 - `npm run typecheck` and `npm run lint` pass.
 - Grep the change for secrets and real identifiers; confirm none.
-- Update `OVERVIEW.md` when capabilities or data flows changed.
+- README, OVERVIEW, and the manifest are updated together (see above).
 - Ship a refreshed desensitized screenshot for visual changes.
-- Registry records pin the exact commit under review; hand-edited record updates are allowed
-  for this repository.
