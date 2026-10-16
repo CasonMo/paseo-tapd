@@ -11,6 +11,7 @@ import {
   fetchFilterOptions,
   fetchMe,
   fetchMyCommentedIds,
+  fetchRelatedStoryIdsFromTasks,
   isoDateDaysAgo,
   resolveConfig,
   searchEntities,
@@ -47,14 +48,16 @@ export function createHandlers(getValues: GetValues) {
             : "";
       let relatedOwner = "";
       let commented: Record<EntityKind, string[]> = { story: [], task: [], bug: [] };
+      let relatedStoryIds: string[] = [];
       if (filters.ownerMode === "related") {
         if (!me?.nick) {
           throw new Error("无法识别当前用户（获取 Token 用户信息失败），「我相关的」过滤暂不可用。");
         }
         relatedOwner = me.nick;
         commented = await fetchMyCommentedIds(config, me.nick);
+        relatedStoryIds = await fetchRelatedStoryIdsFromTasks(config, me.nick, commented.task);
       }
-      const baseOptions: Omit<ColumnQueryOptions, "relatedOwner" | "relatedCommentedIds"> = {
+      const baseOptions: Omit<ColumnQueryOptions, "relatedOwner" | "relatedCommentedIds" | "relatedStoryIds"> = {
         owner,
         creator: filters.creator.trim(),
         keyword: filters.keyword.trim(),
@@ -67,9 +70,24 @@ export function createHandlers(getValues: GetValues) {
         conditions: filters.conditions,
       };
       const [story, task, bug] = await Promise.all([
-        fetchColumn(config, "story", { ...baseOptions, relatedOwner, relatedCommentedIds: commented.story }),
-        fetchColumn(config, "task", { ...baseOptions, relatedOwner, relatedCommentedIds: commented.task }),
-        fetchColumn(config, "bug", { ...baseOptions, relatedOwner, relatedCommentedIds: commented.bug }),
+        fetchColumn(config, "story", {
+          ...baseOptions,
+          relatedOwner,
+          relatedCommentedIds: commented.story,
+          relatedStoryIds,
+        }),
+        fetchColumn(config, "task", {
+          ...baseOptions,
+          relatedOwner,
+          relatedCommentedIds: commented.task,
+          relatedStoryIds: [],
+        }),
+        fetchColumn(config, "bug", {
+          ...baseOptions,
+          relatedOwner,
+          relatedCommentedIds: commented.bug,
+          relatedStoryIds: [],
+        }),
       ]);
       return {
         workspaceCount: config.workspaceIds.length,

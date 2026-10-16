@@ -366,7 +366,6 @@ function MoreFiltersModal({ open, onClose, theme, filters, onChange }: {
               <Text style={styles.rowLabel}>处理人</Text>
               <View style={styles.chips}>
                 <Chip label="我" theme={theme} active={filters.ownerMode === "mine"} onPress={() => onChange({ ownerMode: "mine" })} />
-                {filters.ownerMode === "related" ? <Chip label="我相关的" theme={theme} active /> : null}
                 <Chip label="全部人" theme={theme} active={filters.ownerMode === "all"} onPress={() => onChange({ ownerMode: "all" })} />
                 <Chip label="指定人" theme={theme} active={filters.ownerMode === "custom"} onPress={() => onChange({ ownerMode: "custom" })} />
               </View>

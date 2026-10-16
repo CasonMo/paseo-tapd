@@ -544,6 +544,8 @@ export interface ColumnQueryOptions {
   relatedOwner: string;
   /** relatedOwner 模式下，该类型下当前用户评论过的实体 ID */
   relatedCommentedIds: string[];
+  /** relatedOwner 模式下，关联任务里当前用户参与的 story ID（仅 story 使用） */
+  relatedStoryIds: string[];
   /** 高级筛选条件（动态字段） */
   conditions: ConditionInput[];
 }
@@ -675,6 +677,36 @@ async function requestPost(
     throw new TapdApiError(`TAPD 接口错误：${path}`, String(payload?.info ?? `HTTP ${response.status}`));
   }
   return payload.data;
+}
+
+/** 「我相关的」：找到我参与（处理/创建/抄送/评论）的任务所关联的 story ID */
+export async function fetchRelatedStoryIdsFromTasks(
+  config: TapdConfig,
+  me: string,
+  commentedTaskIds: string[],
+): Promise<string[]> {
+  const ids = new Set<string>();
+  const memberships: Record<string, QueryValue>[] = [{ owner: me }, { creator: me }, { cc: me }];
+  if (commentedTaskIds.length > 0) memberships.push({ id: commentedTaskIds.join(",") });
+  for (const membership of memberships) {
+    for (const workspaceId of config.workspaceIds) {
+      try {
+        const data = await requestJson(
+          config,
+          "/tasks",
+          { workspace_id: workspaceId, limit: 200, order: "modified desc", fields: "id,story_id", ...membership },
+          60_000,
+        );
+        for (const row of unwrapRows(data, ["Task"])) {
+          const storyId = String(row?.story_id ?? "");
+          if (storyId && storyId !== "0") ids.add(storyId);
+        }
+      } catch {
+        // 忽略单个来源失败
+      }
+    }
+  }
+  return [...ids].slice(0, 100);
 }
 
 export interface CreateEntityInput {
@@ -865,8 +897,20 @@ export async function fetchColumn(
         { [kind === "bug" ? "reporter" : "creator"]: options.relatedOwner },
         { cc: options.relatedOwner },
       ];
-      if (options.relatedCommentedIds.length > 0) {
-        membershipQueries.push({ id: options.relatedCommentedIds.join(",") });
+      // 开发人员 / 参与人（按字段定义存在性启用；缺陷的开发人员字段名为 de）
+      const developerParam = kind === "bug" ? "de" : "developer";
+      if (!fieldKeys || fieldKeys.has(developerParam)) {
+        membershipQueries.push({ [developerParam]: options.relatedOwner });
+      }
+      if (!fieldKeys || fieldKeys.has("participator")) {
+        membershipQueries.push({ participator: options.relatedOwner });
+      }
+      const idMembers = new Set<string>(options.relatedCommentedIds);
+      if (kind === "story") {
+        for (const id of options.relatedStoryIds) idMembers.add(id);
+      }
+      if (idMembers.size > 0) {
+        membershipQueries.push({ id: [...idMembers].join(",") });
       }
       const batches = await Promise.all(
         membershipQueries.map((membership) => queryEntityRows(config, kind, { ...dimensionParams, ...membership })),

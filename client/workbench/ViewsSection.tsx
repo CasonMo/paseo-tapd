@@ -34,7 +34,7 @@ export function ViewsSection({ theme, settings }: { theme: WorkbenchTheme; setti
         filters.ownerMode === "mine"
           ? "我"
           : filters.ownerMode === "related"
-            ? "我相关（处理/创建/抄送/评论）"
+            ? "我相关（处理/开发/参与/评论/创建/关联任务）"
             : filters.ownerMode === "custom"
               ? filters.owner.trim() || "全部"
               : "全部"
