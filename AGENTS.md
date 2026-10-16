@@ -80,4 +80,5 @@ Checklist before pushing:
 - `npm run typecheck` and `npm run lint` pass.
 - Grep the change for secrets and real identifiers; confirm none.
 - README, OVERVIEW, and the manifest are updated together (see above).
+- Bump `package.json` and `shared/version.ts` together; the update check compares the registry pin against `shared/version.ts`.
 - Ship a refreshed desensitized screenshot for visual changes.

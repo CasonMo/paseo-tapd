@@ -1,5 +1,5 @@
 import type { RpcInput, RpcOutput } from "@getpaseo/plugin";
-import type { addCommentRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, updateStatusRpc } from "../shared/contracts";
+import type { addCommentRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, updateCheckRpc, updateStatusRpc } from "../shared/contracts";
 import { DEFAULT_FILTERS, type EntityKind, type TapdSettingsValues } from "../shared/contracts";
 import {
   addComment,
@@ -19,6 +19,7 @@ import {
   type ColumnQueryOptions,
   type TapdConfig,
 } from "./tapd";
+import { checkForUpdate } from "./update-check";
 
 type GetValues = () => Promise<TapdSettingsValues>;
 
@@ -194,6 +195,10 @@ export function createHandlers(getValues: GetValues) {
           tokenSource: config.tokenSource,
         };
       }
+    },
+
+    async updateCheck(): Promise<RpcOutput<typeof updateCheckRpc>> {
+      return checkForUpdate();
     },
   };
 }

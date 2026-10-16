@@ -11,6 +11,7 @@ import {
   SettingsSection,
 } from "@getpaseo/plugin/client/ui";
 import { checkRpc, tapdSettings } from "../../shared/contracts";
+import { PLUGIN_VERSION } from "../../shared/version";
 import type { WorkbenchTheme } from "./bits";
 import { ViewsSection, type ReadySettings } from "./ViewsSection";
 
@@ -148,7 +149,7 @@ function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: W
         </SettingsCard>
       </SettingsSection>
       <Text style={{ color: theme.colors.foregroundMuted, fontSize: 11, lineHeight: 16 }}>
-        插件在 daemon 侧调用 TAPD OpenAPI，凭证仅保存在本机。
+        插件在 daemon 侧调用 TAPD OpenAPI，凭证仅保存在本机。当前版本 v{PLUGIN_VERSION}。
       </Text>
     </View>
   );

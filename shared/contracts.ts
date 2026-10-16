@@ -387,3 +387,16 @@ export const checkRpc = defineRpc({
     tokenSource: z.enum(["env", "settings", "none"]),
   }),
 });
+
+export const updateCheckRpc = defineRpc({
+  name: "tapd.update_check",
+  input: z.object({}),
+  output: z.object({
+    currentVersion: z.string(),
+    latestVersion: z.string(),
+    latestCommit: z.string(),
+    updateAvailable: z.boolean(),
+    checkedAt: z.string(),
+  }),
+});
+

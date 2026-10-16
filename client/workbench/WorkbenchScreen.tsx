@@ -4,7 +4,7 @@ import { Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
-import { boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
+import { boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, updateCheckRpc, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
 import { Chip, ToolbarButton } from "./bits";
 import { BindAgentModal } from "./BindAgentModal";
 import { ColumnPickerModal } from "./ColumnPickerModal";
@@ -87,6 +87,15 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     retry: 1,
   });
 
+  const fetchUpdateCheck = useRpc(updateCheckRpc);
+  const updateQuery = useQuery({
+    queryKey: ["tapd-update-check"],
+    queryFn: () => fetchUpdateCheck({}),
+    staleTime: 3_600_000,
+    retry: 1,
+  });
+  const [updateDismissed, setUpdateDismissed] = useState(false);
+
   const handleFiltersChange = useCallback((patch: Partial<TapdFilters>) => {
     setFilters((current) => (current ? { ...current, ...patch } : current));
   }, []);
@@ -102,6 +111,10 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     updated: TextStyle;
     tabRow: ViewStyle;
     errorBanner: TextStyle;
+    updateBanner: ViewStyle;
+    updateText: TextStyle;
+    updateDismiss: ViewStyle;
+    updateDismissText: TextStyle;
     modalInput: TextStyle;
     modalActions: ViewStyle;
     primaryButton: ViewStyle;
@@ -119,6 +132,20 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     updated: { color: theme.colors.foregroundMuted, fontSize: 11 },
     tabRow: { flexDirection: "row", gap: 8 },
     errorBanner: { color: theme.colors.statusDanger, fontSize: 12, lineHeight: 18 },
+    updateBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: theme.colors.surface2,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    updateText: { flex: 1, color: theme.colors.foreground, fontSize: 12, lineHeight: 18 },
+    updateDismiss: { paddingHorizontal: 4, paddingVertical: 2 },
+    updateDismissText: { color: theme.colors.foregroundMuted, fontSize: 12 },
     modalInput: {
       backgroundColor: theme.colors.surface2,
       borderColor: theme.colors.border,
@@ -300,6 +327,16 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
 
   return (
     <View style={styles.screen}>
+      {updateQuery.data?.updateAvailable && !updateDismissed ? (
+        <View style={styles.updateBanner}>
+          <Text style={styles.updateText}>
+            发现新版本 v{updateQuery.data.latestVersion}（当前 v{updateQuery.data.currentVersion}）· 更新：paseo plugin update tapd-workbench
+          </Text>
+          <Pressable accessibilityRole="button" onPress={() => setUpdateDismissed(true)} style={styles.updateDismiss}>
+            <Text style={styles.updateDismissText}>✕</Text>
+          </Pressable>
+        </View>
+      ) : null}
       <View style={styles.toolbar}>
         {views.map((view) => (
           <Chip
