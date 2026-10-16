@@ -196,6 +196,7 @@ export function DispatchModal({ open, onClose, theme, data, defaultRepoPath, def
         workspaceId: workspace.id,
         agentId: agent.id,
         workspaceTitle: workspace.name || workspaceTitle,
+        agentTitle: `TAPD #${data.id}`,
         createdAt: new Date().toISOString(),
       };
       onCreated({ link, repoPath: trimmedRepo, provider: trimmedProvider });

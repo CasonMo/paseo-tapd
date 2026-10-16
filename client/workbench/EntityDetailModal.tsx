@@ -20,7 +20,8 @@ export interface DetailExtras {
   links: readonly TapdLink[];
   navigation?: PluginScreenProps["navigation"];
   refreshToken: number;
-  onLinkCreated?: (input: { link: TapdLink; repoPath: string; provider: string }) => void;
+  onLinkCreated?: (input: { link: TapdLink; repoPath?: string; provider?: string }) => void;
+  onBindAgent?: (data: EntityDetailData) => void;
   onRemoveLink?: (link: TapdLink) => void;
   onDispatch?: (data: EntityDetailData) => void;
   onComment?: (data: EntityDetailData) => void;
@@ -250,6 +251,10 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
         <Pressable accessibilityRole="button" style={styles.action} onPress={() => extras.onDispatch?.(data)}>
           <Icon name="Bot" size={14} color={theme.colors.foreground} />
           <Text style={styles.actionLabel}>派给 Agent</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" style={styles.action} onPress={() => extras.onBindAgent?.(data)}>
+          <Icon name="Link" size={14} color={theme.colors.foreground} />
+          <Text style={styles.actionLabel}>绑定 Agent</Text>
         </Pressable>
         <Pressable accessibilityRole="button" style={styles.action} onPress={() => extras.onComment?.(data)}>
           <Icon name="MessageSquarePlus" size={14} color={theme.colors.foreground} />

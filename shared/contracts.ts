@@ -97,6 +97,7 @@ export const tapdSettingsSchema = z.object({
       workspaceId: z.string(),
       agentId: z.string().default(""),
       workspaceTitle: z.string().default(""),
+      agentTitle: z.string().default(""),
       createdAt: z.string().default(""),
     }),
   ).default([]),

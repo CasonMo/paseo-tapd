@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
 import { Chip, ToolbarButton } from "./bits";
+import { BindAgentModal } from "./BindAgentModal";
 import { ColumnPickerModal } from "./ColumnPickerModal";
 import { KindColumn, StatusColumn, type BoardEntityItem } from "./ColumnView";
 import { CreateEntityModal, type CreatedEntity } from "./CreateEntityModal";
@@ -59,6 +60,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   const [dispatchTarget, setDispatchTarget] = useState<EntityDetailData | null>(null);
   const [commentTarget, setCommentTarget] = useState<EntityDetailData | null>(null);
   const [statusTarget, setStatusTarget] = useState<EntityDetailData | null>(null);
+  const [bindTarget, setBindTarget] = useState<EntityDetailData | null>(null);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [boardHeight, setBoardHeight] = useState(0);
 
@@ -253,14 +255,14 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     void board.refetch();
   }
 
-  async function handleLinkCreated(input: { link: TapdLink; repoPath: string; provider: string }) {
+  async function handleLinkCreated(input: { link: TapdLink; repoPath?: string; provider?: string }) {
     const values = readySettings.values;
     const ok = await readySettings.save(
       {
         ...values,
         links: [...values.links, input.link],
-        lastRepoPath: input.repoPath,
-        lastProvider: input.provider,
+        lastRepoPath: input.repoPath ?? values.lastRepoPath,
+        lastProvider: input.provider ?? values.lastProvider,
       },
       readySettings.revision,
     );
@@ -289,6 +291,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     onLinkCreated: (input) => void handleLinkCreated(input),
     onRemoveLink: (link) => void handleRemoveLink(link),
     onDispatch: (data) => setDispatchTarget(data),
+    onBindAgent: (data) => setBindTarget(data),
     onComment: (data) => setCommentTarget(data),
     onStatus: (data) => setStatusTarget(data),
   };
@@ -485,6 +488,16 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
           id={statusTarget.id}
           current={statusTarget.status}
           onDone={handleWriteDone}
+        />
+      ) : null}
+      {bindTarget ? (
+        <BindAgentModal
+          open
+          onClose={() => setBindTarget(null)}
+          theme={theme}
+          data={bindTarget}
+          links={links}
+          onBound={(link) => void handleLinkCreated({ link })}
         />
       ) : null}
       <Modal title="保存为新视图" open={saveViewOpen} onOpenChange={(next) => { if (!next) setSaveViewOpen(false); }}>

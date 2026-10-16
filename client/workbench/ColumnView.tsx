@@ -123,7 +123,7 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
         </Pressable>
       </View>
       <View style={styles.meta}>
-        {linked ? <Chip label="已派发" theme={theme} color={theme.colors.accent} /> : null}
+        {linked ? <Chip label="已关联" theme={theme} color={theme.colors.accent} /> : null}
         {entity.priority ? <Chip label={entity.priority} theme={theme} /> : null}
         {entity.iterationName ? <Chip label={entity.iterationName} theme={theme} /> : null}
       </View>
