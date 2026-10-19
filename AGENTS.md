@@ -42,7 +42,10 @@ Paseo plugin requirements we must follow when developing, reviewing, and releasi
   item IDs, tokens, cookies, internal hostnames, or customer data in code, comments, docs,
   fixtures, examples, screenshots, or commit messages.
 - Use obvious placeholders such as `<workspace-id>`, `<token>`, `example.com`, `12345678`.
-- Screenshots and media must be captured against fake data before they are committed.
+- Screenshots and media: agents must never capture, generate, edit, replace, or push
+  images themselves. Only screenshots supplied by the author may be committed, and only
+  after the author confirms they are desensitized. Never push an image change the author
+  did not provide.
 
 ## Code safety
 
@@ -81,4 +84,5 @@ Checklist before pushing:
 - Grep the change for secrets and real identifiers; confirm none.
 - README, OVERVIEW, and the manifest are updated together (see above).
 - Bump `package.json` and `shared/version.ts` together; the update check compares the registry pin against `shared/version.ts`.
-- Ship a refreshed desensitized screenshot for visual changes.
+- For visual changes, ship a refreshed screenshot only when the author provides one
+  (desensitized); never capture or generate screenshots yourself.
