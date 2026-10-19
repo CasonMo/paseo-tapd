@@ -144,6 +144,7 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
     section: TextStyle;
     linkRow: ViewStyle;
     linkTitle: TextStyle;
+    childMeta: TextStyle;
     linkAction: TextStyle;
     linkDanger: TextStyle;
     box: ViewStyle;
@@ -182,7 +183,6 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
       paddingVertical: 8,
     },
     linkTitle: { color: theme.colors.foreground, fontSize: 12, flexShrink: 1 },
-    childKindLabel: { color: theme.colors.foregroundMuted, fontSize: 11 },
     childMeta: { color: theme.colors.foregroundMuted, fontSize: 11 },
     linkAction: { color: theme.colors.accent, fontSize: 12 },
     linkDanger: { color: theme.colors.statusDanger, fontSize: 12 },
@@ -320,34 +320,12 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
           <>
             <Text style={styles.section}>关联任务</Text>
             {entityLinks.map((link) => (
-              <View key={`${link.workspaceId}-${link.agentId}`} style={styles.linkRow}>
-                <Icon name="Bot" size={14} color={theme.colors.accent} />
-                <Text style={styles.linkTitle} numberOfLines={1}>
-                  {link.workspaceTitle || link.workspaceId}
-                </Text>
-                <View style={{ flex: 1 }} />
-                {extras.navigation?.openWorkspace ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => extras.navigation?.openWorkspace?.({ workspaceId: link.workspaceId })}
-                  >
-                    <Text style={styles.linkAction}>打开工作区</Text>
-                  </Pressable>
-                ) : null}
-                {link.agentId && extras.navigation?.openAgent ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => extras.navigation?.openAgent?.({ agentId: link.agentId })}
-                  >
-                    <Text style={styles.linkAction}>打开 Agent</Text>
-                  </Pressable>
-                ) : null}
-                {extras.onRemoveLink ? (
-                  <Pressable accessibilityRole="button" onPress={() => extras.onRemoveLink?.(link)}>
-                    <Text style={styles.linkDanger}>解除</Text>
-                  </Pressable>
-                ) : null}
-              </View>
+              <AgentLinkRow
+                key={`${link.workspaceId}-${link.agentId}`}
+                link={link}
+                theme={theme}
+                extras={extras}
+              />
             ))}
           </>
         );
@@ -496,6 +474,107 @@ function ChildListSection({ label, items, theme, extras }: {
           >
             <Icon name="ChevronRight" size={16} color={safePage >= pageCount ? theme.colors.border : theme.colors.accent} />
           </Pressable>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** 关联 Agent 行：悬停/点击展示保存的提示词前 200 字 */
+function AgentLinkRow({ link, theme, extras }: {
+  link: TapdLink;
+  theme: WorkbenchTheme;
+  extras: DetailExtras;
+}) {
+  const [hovering, setHovering] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const title = useMemo(() => {
+    const base = link.agentTitle || link.workspaceTitle || "";
+    return base.length > 40 ? `${base.slice(0, 40)}…` : base;
+  }, [link.agentTitle, link.workspaceTitle]);
+  const shortId = (link.agentId || link.workspaceId).slice(0, 8);
+  const showTip = hovering || pinned;
+
+  const styles = useMemo<{
+    row: ViewStyle;
+    tipBox: ViewStyle;
+    tipText: TextStyle;
+    titleText: TextStyle;
+    idText: TextStyle;
+    actionText: TextStyle;
+    dangerText: TextStyle;
+  }>(() => ({
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: theme.colors.surface0,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    tipBox: {
+      position: "absolute",
+      top: 38,
+      left: 26,
+      right: 26,
+      zIndex: 20,
+      backgroundColor: theme.colors.surface2,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 10,
+    },
+    tipText: { color: theme.colors.foreground, fontSize: 12, lineHeight: 18 },
+    titleText: { color: theme.colors.foreground, fontSize: 12, flexShrink: 1 },
+    idText: { color: theme.colors.foregroundMuted, fontSize: 11 },
+    actionText: { color: theme.colors.accent, fontSize: 12 },
+    dangerText: { color: theme.colors.statusDanger, fontSize: 12 },
+  }), [theme]);
+
+  const snippet = link.promptSnippet.trim();
+
+  return (
+    <View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`关联 Agent ${title || shortId}，悬停查看提示词`}
+        style={styles.row}
+        // 桌面端（react-native-web）悬停预览；移动端无 hover，由点击固定兜底
+        onHoverIn={() => setHovering(true)}
+        onHoverOut={() => setHovering(false)}
+        onPress={() => setPinned((value) => !value)}
+      >
+        <Icon name="Bot" size={14} color={theme.colors.accent} />
+        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={styles.titleText} numberOfLines={1}>
+            {title || `wks ${link.workspaceId}`}
+          </Text>
+          <Text style={styles.idText}>{shortId}</Text>
+        </View>
+        {extras.navigation?.openWorkspace ? (
+          <Pressable accessibilityRole="button" onPress={() => extras.navigation?.openWorkspace?.({ workspaceId: link.workspaceId })}>
+            <Text style={styles.actionText}>打开工作区</Text>
+          </Pressable>
+        ) : null}
+        {link.agentId && extras.navigation?.openAgent ? (
+          <Pressable accessibilityRole="button" onPress={() => extras.navigation?.openAgent?.({ agentId: link.agentId })}>
+            <Text style={styles.actionText}>打开 Agent</Text>
+          </Pressable>
+        ) : null}
+        {extras.onRemoveLink ? (
+          <Pressable accessibilityRole="button" onPress={() => extras.onRemoveLink?.(link)}>
+            <Text style={styles.dangerText}>解除</Text>
+          </Pressable>
+        ) : null}
+      </Pressable>
+      {showTip ? (
+        <View style={styles.tipBox}>
+          <Text style={styles.tipText} selectable>
+            {snippet || "（该绑定创建于旧版本，未记录提示词）"}
+          </Text>
         </View>
       ) : null}
     </View>

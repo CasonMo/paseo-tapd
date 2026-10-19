@@ -198,6 +198,7 @@ export function DispatchModal({ open, onClose, theme, data, defaultRepoPath, def
         workspaceTitle: workspace.name || workspaceTitle,
         agentTitle: `TAPD #${data.id}`,
         createdAt: new Date().toISOString(),
+        promptSnippet: prompt.trim().slice(0, 200),
       };
       onCreated({ link, repoPath: trimmedRepo, provider: trimmedProvider });
       toast.show("已派发，Agent 开始工作", { variant: "success" });

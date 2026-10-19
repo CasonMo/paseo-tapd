@@ -99,6 +99,8 @@ export const tapdSettingsSchema = z.object({
       workspaceTitle: z.string().default(""),
       agentTitle: z.string().default(""),
       createdAt: z.string().default(""),
+      /** 创建绑定时提示词的前 200 字（旧数据为空） */
+      promptSnippet: z.string().default(""),
     }),
   ).default([]),
   /** 上次派活使用的仓库与模型（默认值） */

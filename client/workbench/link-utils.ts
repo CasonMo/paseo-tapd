@@ -9,6 +9,8 @@ export function makeLink(input: {
   agentId: string;
   agentTitle: string;
   workspaceTitle?: string;
+  /** 提示词前 200 字，用于详情面板悬停预览 */
+  promptSnippet?: string;
 }): TapdLink {
   return {
     key: `${input.kind}-${input.id}`,
@@ -19,6 +21,7 @@ export function makeLink(input: {
     workspaceTitle: input.workspaceTitle ?? "",
     agentTitle: input.agentTitle,
     createdAt: new Date().toISOString(),
+    promptSnippet: input.promptSnippet ?? "",
   };
 }
 

@@ -91,18 +91,20 @@ export function BindAgentModal({ open, onClose, theme, data, links, onBound }: {
     if (bindingId) return;
     setBindingId(agent.id);
     try {
+      const notice = bindNoticeText({ kind: data.kind, id: data.id, title: data.title, statusLabel: data.statusLabel, url: data.url });
       const link = makeLink({
         kind: data.kind,
         id: data.id,
         workspaceId: agent.workspaceId,
         agentId: agent.id,
         agentTitle: agent.title,
+        promptSnippet: notice.slice(0, 200),
       });
       onBound(link);
       const notified = await notifyAgent(
         paseo,
         agent.id,
-        bindNoticeText({ kind: data.kind, id: data.id, title: data.title, statusLabel: data.statusLabel, url: data.url }),
+        notice,
       );
       toast.show(notified ? `已关联并通知「${agent.title}」` : `已关联「${agent.title}」`, { variant: "success" });
       onClose();
