@@ -323,6 +323,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     onBindAgent: (data) => setBindTarget(data),
     onComment: (data) => setCommentTarget(data),
     onStatus: (data) => setStatusTarget(data),
+    onOpenEntity: (target) => setDetail(target),
   };
 
   return (

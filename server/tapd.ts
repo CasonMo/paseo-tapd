@@ -45,6 +45,17 @@ export interface EntityComment {
   text: string;
 }
 
+/** 需求详情中的子单据行（关联任务/关联缺陷） */
+export interface EntityChildItem {
+  kind: EntityKind;
+  id: string;
+  title: string;
+  statusLabel: string;
+  owner: string;
+  priority: string;
+  url: string;
+}
+
 export interface EntityDetailResult {
   kind: EntityKind;
   id: string;
@@ -61,6 +72,12 @@ export interface EntityDetailResult {
   description: string;
   comments: EntityComment[];
   commentsError: string | null;
+  /** 仅需求：该需求下挂的任务（TAPD task.story_id） */
+  childTasks: EntityChildItem[];
+  /** 仅需求：该需求下挂的缺陷（TAPD bug.story_id） */
+  childBugs: EntityChildItem[];
+  /** 仅任务/缺陷：所属需求（TAPD task.story_id / bug.story_id） */
+  parentStory: { id: string; title: string; url: string } | null;
 }
 
 export interface AttachmentSearchItem {
@@ -993,7 +1010,31 @@ export async function fetchEntity(config: TapdConfig, kind: EntityKind, id: stri
     description: truncate(htmlToText(String(row.description ?? "")), 4000),
     comments: [],
     commentsError: null,
+    childTasks: [],
+    childBugs: [],
+    parentStory: null,
   };
+
+  // 任务/缺陷详情：解析所属需求（story_id），点击可跳回需求详情
+  if (kind !== "story") {
+    const storyId = String(row.story_id ?? "").trim();
+    if (storyId && storyId !== "0") {
+      const parent = { id: storyId, title: "", url: entityUrl(config, workspaceId, "story", storyId) };
+      try {
+        const data = await requestJson(config, "/stories", {
+          workspace_id: workspaceId,
+          id: storyId,
+          limit: 1,
+          fields: "id,name",
+        });
+        const storyRow = unwrapRows(data, ["Story"])[0];
+        parent.title = String(storyRow?.name ?? "").trim();
+      } catch {
+        // 需求标题读取失败时仅展示 ID
+      }
+      detail.parentStory = parent;
+    }
+  }
 
   const entryType = kind === "story" ? "stories" : kind === "bug" ? "bug|bug_remark" : "tasks";
   try {
@@ -1012,6 +1053,46 @@ export async function fetchEntity(config: TapdConfig, kind: EntityKind, id: stri
     }));
   } catch (error) {
     detail.commentsError = describeError(error);
+  }
+
+  // 需求详情：拉取该需求下挂的任务与缺陷（task.story_id / bug.story_id）
+  if (kind === "story") {
+    const labelsFor: Record<EntityKind, Record<string, string>> = {
+      task: await fetchStatusLabels(config, "task"),
+      bug: await fetchStatusLabels(config, "bug"),
+      story: {},
+    };
+    const loadChildren = async (childKind: Exclude<EntityKind, "story">): Promise<EntityChildItem[]> => {
+      try {
+        const data = await requestJson(config, LIST_PATH[childKind], {
+          workspace_id: workspaceId,
+          story_id: id,
+          limit: 200,
+          order: "modified desc",
+          fields: LIST_FIELDS[childKind],
+        });
+        return unwrapRows(data, [KIND_WRAPPER[childKind]])
+          .map((row) => {
+            const childId = String(row?.id ?? "");
+            const status = String(row?.status ?? "");
+            return {
+              kind: childKind,
+              id: childId,
+              title: String((childKind === "bug" ? row?.title : row?.name) ?? ""),
+              statusLabel: labelsFor[childKind][status] ?? status,
+              owner: String((childKind === "bug" ? row?.current_owner : row?.owner) ?? "").trim(),
+              priority: String(row?.priority_label ?? "").trim(),
+              url: entityUrl(config, workspaceId, childKind, childId),
+            };
+          })
+          .filter((item) => item.id.length > 0);
+      } catch {
+        return []; // 子单据读取失败不阻塞需求详情
+      }
+    };
+    const [tasks, bugs] = await Promise.all([loadChildren("task"), loadChildren("bug")]);
+    detail.childTasks = tasks;
+    detail.childBugs = bugs;
   }
   return detail;
 }

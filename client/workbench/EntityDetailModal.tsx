@@ -2,7 +2,7 @@ import type { RpcOutput } from "@getpaseo/plugin";
 import { openExternalUrl, useRpc, type PluginScreenProps } from "@getpaseo/plugin/client";
 import { Icon, Modal, copyText, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type TextStyle, type ViewStyle } from "react-native";
 import { entityRpc, type EntityKind, type TapdLink } from "../../shared/contracts";
 import { Chip, formatTime, type WorkbenchTheme } from "./bits";
@@ -26,6 +26,8 @@ export interface DetailExtras {
   onDispatch?: (data: EntityDetailData) => void;
   onComment?: (data: EntityDetailData) => void;
   onStatus?: (data: EntityDetailData) => void;
+  /** 在详情面板中打开另一个单据（点击需求下的任务/缺陷行） */
+  onOpenEntity?: (target: DetailTarget) => void;
 }
 
 /** 宽屏：居中浮窗（宽度自主控制，遮罩点击 / X 关闭） */
@@ -180,6 +182,8 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
       paddingVertical: 8,
     },
     linkTitle: { color: theme.colors.foreground, fontSize: 12, flexShrink: 1 },
+    childKindLabel: { color: theme.colors.foregroundMuted, fontSize: 11 },
+    childMeta: { color: theme.colors.foregroundMuted, fontSize: 11 },
     linkAction: { color: theme.colors.accent, fontSize: 12 },
     linkDanger: { color: theme.colors.statusDanger, fontSize: 12 },
     box: {
@@ -294,6 +298,20 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
       {metaRow("迭代", data.iterationName)}
       {metaRow("创建", data.createdAt)}
       {metaRow("更新", data.modifiedAt)}
+      {data.parentStory ? (
+        <View style={styles.metaRow}>
+          <Text style={styles.metaLabel}>所属需求</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`打开所属需求 #${data.parentStory.id}`}
+            onPress={() => openParentStory(data.parentStory, extras)}
+          >
+            <Text style={{ ...styles.linkAction, flex: 1 }} numberOfLines={1}>
+              #{data.parentStory.id} {data.parentStory.title || "（标题未获取）"}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
       {(() => {
         const entityKey = `${data.kind}-${data.id}`;
         const entityLinks = extras.links.filter((link) => link.key === entityKey);
@@ -334,6 +352,12 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
           </>
         );
       })()}
+      {data.kind === "story" && data.childTasks.length > 0 ? (
+        <ChildListSection key={`${data.id}-task`} label="需求下任务" items={data.childTasks} theme={theme} extras={extras} />
+      ) : null}
+      {data.kind === "story" && data.childBugs.length > 0 ? (
+        <ChildListSection key={`${data.id}-bug`} label="需求下缺陷" items={data.childBugs} theme={theme} extras={extras} />
+      ) : null}
       <Text style={styles.section}>描述</Text>
       <View style={styles.box}>
         <Text style={styles.description} selectable>
@@ -358,6 +382,122 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
           </View>
         ))
       )}
+    </View>
+  );
+}
+
+type EntityChildItem = NonNullable<EntityDetailData["childTasks"]>[number];
+
+/** 打开所属需求：优先在浮窗内切换详情，否则在浏览器打开 */
+function openParentStory(
+  parent: EntityDetailData["parentStory"],
+  extras: DetailExtras,
+) {
+  if (!parent) return;
+  if (extras.onOpenEntity) {
+    extras.onOpenEntity({ kind: "story", id: parent.id, title: parent.title || `#${parent.id}` });
+    return;
+  }
+  void openExternalUrl(parent.url);
+}
+
+/** 需求详情：该需求下挂的任务/缺陷列表（10 条一页，可翻页） */
+function ChildListSection({ label, items, theme, extras }: {
+  label: string;
+  items: readonly EntityChildItem[];
+  theme: WorkbenchTheme;
+  extras: DetailExtras;
+}) {
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const start = (safePage - 1) * PAGE_SIZE;
+  const visible = items.slice(start, start + PAGE_SIZE);
+
+  const styles = useMemo<{
+    section: TextStyle;
+    row: ViewStyle;
+    title: TextStyle;
+    meta: TextStyle;
+    action: TextStyle;
+    pager: ViewStyle;
+    pageText: TextStyle;
+    pageBtn: TextStyle;
+    pageBtnDisabled: TextStyle;
+  }>(() => ({
+    section: { color: theme.colors.foregroundMuted, fontSize: 12 },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: theme.colors.surface0,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    title: { color: theme.colors.foreground, fontSize: 12, flex: 1, flexShrink: 1 },
+    meta: { color: theme.colors.foregroundMuted, fontSize: 11 },
+    action: { color: theme.colors.accent, fontSize: 12 },
+    pager: { flexDirection: "row", alignItems: "center", gap: 10, justifyContent: "flex-end" },
+    pageText: { color: theme.colors.foregroundMuted, fontSize: 11 },
+    pageBtn: { color: theme.colors.accent, fontSize: 14 },
+    pageBtnDisabled: { color: theme.colors.border, fontSize: 14 },
+  }), [theme]);
+
+  function openChild(item: EntityChildItem) {
+    if (extras.onOpenEntity) {
+      extras.onOpenEntity({ kind: item.kind, id: item.id, title: item.title });
+      return;
+    }
+    void openExternalUrl(item.url);
+  }
+
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={styles.section}>{label}（{items.length}）</Text>
+      {visible.map((item) => (
+        <Pressable
+          key={item.id}
+          accessibilityRole="button"
+          accessibilityLabel={`打开${item.kind === "task" ? "任务" : "缺陷"} #${item.id}`}
+          style={styles.row}
+          onPress={() => openChild(item)}
+        >
+          <Icon name={item.kind === "task" ? "ListTodo" : "Bug"} size={14} color={theme.colors.accent} />
+          <Text style={styles.title} numberOfLines={1}>
+            #{item.id} {item.title}
+          </Text>
+          <Text style={styles.meta}>{item.statusLabel}</Text>
+          {item.owner ? <Text style={styles.meta}>{item.owner}</Text> : null}
+          <Text style={styles.action}>详情</Text>
+        </Pressable>
+      ))}
+      {pageCount > 1 ? (
+        <View style={styles.pager}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="上一页"
+            hitSlop={8}
+            disabled={safePage <= 1}
+            onPress={() => setPage(safePage - 1)}
+          >
+            <Icon name="ChevronLeft" size={16} color={safePage <= 1 ? theme.colors.border : theme.colors.accent} />
+          </Pressable>
+          <Text style={styles.pageText}>第 {safePage} / {pageCount} 页</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="下一页"
+            hitSlop={8}
+            disabled={safePage >= pageCount}
+            onPress={() => setPage(safePage + 1)}
+          >
+            <Icon name="ChevronRight" size={16} color={safePage >= pageCount ? theme.colors.border : theme.colors.accent} />
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -317,6 +317,16 @@ export const addCommentRpc = defineRpc({
   output: z.object({ ok: z.boolean() }),
 });
 
+const entityChildItemSchema = z.object({
+  kind: entityKindSchema,
+  id: z.string(),
+  title: z.string(),
+  statusLabel: z.string(),
+  owner: z.string(),
+  priority: z.string(),
+  url: z.string(),
+});
+
 export const entityRpc = defineRpc({
   name: "tapd.entity",
   input: z.object({ kind: entityKindSchema, id: z.string() }),
@@ -343,6 +353,12 @@ export const entityRpc = defineRpc({
       }),
     ),
     commentsError: z.string().nullable(),
+    /** 仅需求：该需求下挂的任务 */
+    childTasks: z.array(entityChildItemSchema).default([]),
+    /** 仅需求：该需求下挂的缺陷 */
+    childBugs: z.array(entityChildItemSchema).default([]),
+    /** 仅任务/缺陷：所属需求 */
+    parentStory: z.object({ id: z.string(), title: z.string(), url: z.string() }).nullable().default(null),
   }),
 });
 
