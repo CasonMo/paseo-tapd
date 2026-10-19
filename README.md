@@ -63,8 +63,65 @@ MIT
 
 ---
 
-## 中文说明（简版）
+# 中文说明
 
-TAPD 工作台 Paseo 插件：聚合（三栏并排，按状态分组可折叠）+ 需求/任务/缺陷 tab，按状态分列看板（列可自选）、可复用视图过滤（内置「我相关的」）、单据详情浮窗、派给 Agent（worktree + agent 关联追踪）、评论与状态回写、单据快照附件源、工作台内直接建单。
+一款把 TAPD（需求、任务、缺陷）带进 Paseo 工作区的插件：三栏并排看板、可复用视图、派给 Agent、评论与状态回写。
 
-安装：`paseo plugin add git:CasonMo/paseo-tapd`（需 Paseo >= 0.11.2），安装后在插件设置中填写 TAPD Token 与项目 ID（或配置环境变量 `TAPD_TOKEN` / `TAPD_WORKSPACE_IDS`）。支持绑定 Agent：在单据详情浮窗里把单据关联到一个已有 Agent；绑定后自动给该 Agent 发送跟进提示词，并为其注入 TAPD 环境变量以便直接调用 OpenAPI；registry 上架新版本时工作台顶部会显示更新横幅（含更新命令）。能力与数据流向的完整说明见 `OVERVIEW.md`。
+![TAPD 工作台](assets/screenshots/workbench-v2.png)
+
+## 功能
+
+- 聚合页签（需求 / 任务 / 缺陷三栏并排，按状态分组可折叠）+ 每个类型一个独立页签的状态列看板；列可自选、状态标签带颜色、卡片可加星置顶
+- 视图 = 可复用的过滤预设：内置「我相关的」（负责人、创建人、开发、参与、关注或评论过，以及关联任务涉及我），另支持关键词、负责人、创建人、状态范围、迭代、最近更新时间、优先级、缺陷严重程度、标签，以及工作区 TAPD 字段定义中的任意字段
+- 单据详情浮窗：描述、评论、在 TAPD 中打开、复制链接
+- 派给 Agent：选择仓库与 provider/model；插件创建 worktree 工作区并启动一个预置了单据快照的 Agent，之后可从卡片追踪
+- 回写 TAPD：评论（纯文本自动转 HTML）、工作流状态变更、新建单据
+- 附件源：撰写提示词时搜索 TAPD 单据并附上快照
+- Agent 绑定：在单据详情浮窗中选择一个 Agent 关联该单据；绑定后该 Agent 会收到一条带单据快照的简短跟进提示，Agent 会话会在未定义时注入 TAPD 环境变量，使其可直接查询与更新 TAPD
+- 更新检查：registry 固定到新版本时，工作台顶部显示带更新命令的横幅（`paseo plugin update tapd-workbench`）
+
+## 安装
+
+需要 Paseo >= 0.11.2（daemon 与 client）。
+
+```bash
+# 从 GitHub
+paseo plugin add git:CasonMo/paseo-tapd
+
+# 或任意 Git 源
+paseo plugin add git:<repo-url>
+```
+
+安装后在 设置 → 插件 中启用并配置：
+
+- API Token：TAPD OpenAPI token（未填写时回退 daemon 环境变量 `TAPD_TOKEN`）
+- 项目 ID：TAPD `workspace_id` 列表（回退 `TAPD_WORKSPACE_IDS`）
+
+可在插件设置中用「测试连接」验证。
+
+## Agent 绑定
+
+在单据详情浮窗里选择一个 Agent，把单据关联到该会话。绑定的 Agent 会收到一条带单据快照的跟进提示；Agent 会话在未定义时会收到 TAPD 连接环境变量，便于 Agent 直接查询与更新 TAPD。
+
+## 安全
+
+- 本仓库不存储任何凭据。Token 仅由 daemon 侧插件使用，作为 TAPD 的 `Authorization` 头。
+- 优先使用环境变量（`TAPD_TOKEN`、`TAPD_WORKSPACE_IDS`）。保存在插件设置中的 token 以明文 JSON 存于 daemon 主机，可被已连接的设置界面读取。
+- 插件只调用 TAPD OpenAPI。API 基地址与网页链接基地址可用 `TAPD_API_ENDPOINT`、`TAPD_SITE_URL` 按 daemon 覆盖。
+- 读取覆盖所有已配置项目。写操作（评论、状态变更、建单）只作用于第一个配置的 TAPD 项目。
+- 派给 Agent 时，单据快照（作为提示词）经 Paseo SDK 发送给所选的 agent provider。
+- 更新检查从 GitHub 拉取公开的 registry 记录与固定提交处的本仓库清单（`raw.githubusercontent.com`，失败时回退 `api.github.com`），不附带凭据、不发送用户数据，结果缓存一小时。
+
+## 开发
+
+```bash
+npm install
+npm run typecheck
+npm run lint                                       # React Hooks 规则检查
+paseo plugin install /本仓库的绝对路径               # 从本地目录安装
+paseo plugin reload tapd-workbench                 # 修改后重新加载
+```
+
+## 许可证
+
+MIT
