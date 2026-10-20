@@ -8,6 +8,14 @@ import { Chip, type WorkbenchTheme } from "./bits";
 
 const KIND_TITLES: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
 
+/** 本地时区 YYYY-MM-DD，days=0 今天、1 明天 */
+function localDate(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export interface CreatedEntity {
   id: string;
   kind: EntityKind;
@@ -358,13 +366,21 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
                 return (
                   <View key={field.key} style={styles.row}>
                     <Text style={styles.rowLabel} numberOfLines={1}>{label}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={field.inputKind === "date" ? "如 YYYY-MM-DD" : "可选"}
-                      placeholderTextColor={theme.colors.foregroundMuted}
-                      value={value}
-                      onChangeText={setValue}
-                    />
+                    <View style={{ ...styles.chips, rowGap: 6 }}>
+                      {field.inputKind === "date" ? (
+                        <>
+                          <Chip label="今天" theme={theme} active={value === localDate(0)} onPress={() => setValue(localDate(0))} />
+                          <Chip label="明天" theme={theme} active={value === localDate(1)} onPress={() => setValue(localDate(1))} />
+                        </>
+                      ) : null}
+                      <TextInput
+                        style={styles.input}
+                        placeholder={field.inputKind === "date" ? "如 YYYY-MM-DD" : "可选"}
+                        placeholderTextColor={theme.colors.foregroundMuted}
+                        value={value}
+                        onChangeText={setValue}
+                      />
+                    </View>
                   </View>
                 );
               })
