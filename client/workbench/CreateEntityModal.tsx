@@ -1,4 +1,4 @@
-import { useRpc } from "@getpaseo/plugin/client";
+import { useRpc, openExternalUrl } from "@getpaseo/plugin/client";
 import { FlatList, Icon, Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -15,11 +15,21 @@ export interface CreatedEntity {
   title: string;
 }
 
-export function CreateEntityModal({ open, onClose, theme, onCreated }: {
+/** 从需求详情发起创建时的预填上下文：锁类别为任务/缺陷并挂到该需求 */
+export interface CreateChildPreset {
+  kind: "task" | "bug";
+  storyId: string;
+  workspaceId: string;
+  storyTitle: string;
+  storyUrl: string;
+}
+
+export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: {
   open: boolean;
   onClose: () => void;
   theme: WorkbenchTheme;
   onCreated: (created: CreatedEntity) => void;
+  initial?: CreateChildPreset | null;
 }) {
   const create = useRpc(createRpc);
   const fetchOptions = useRpc(filterOptionsRpc);
@@ -51,8 +61,10 @@ export function CreateEntityModal({ open, onClose, theme, onCreated }: {
       setIterationId("");
       setMode("form");
       setSubmitting(false);
+    } else if (initial) {
+      setKind(initial.kind);
     }
-  }, [open]);
+  }, [open, initial]);
 
   const priorityOptions = useMemo(
     () => (optionsQuery.data?.priorities ?? []).filter((option) => option.kinds.includes(kind)),
@@ -75,6 +87,8 @@ export function CreateEntityModal({ open, onClose, theme, onCreated }: {
         owner: owner.trim(),
         priority,
         iterationId,
+        storyId: initial ? initial.storyId : undefined,
+        workspaceId: initial ? initial.workspaceId : undefined,
       });
       toast.show(`已创建「${trimmed}」#${created.id}`, { variant: "success" });
       onCreated({ id: created.id, kind: created.kind, url: created.url, title: trimmed });
@@ -174,10 +188,20 @@ export function CreateEntityModal({ open, onClose, theme, onCreated }: {
     <Modal title="新建单据" open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <Modal.Content>
         <View style={{ gap: 10 }}>
+          {initial ? (
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>挂载到</Text>
+              <Pressable accessibilityRole="button" onPress={() => void openExternalUrl(initial.storyUrl)}>
+                <Text style={{ ...styles.link, flex: 1 }} numberOfLines={1}>
+                  #{initial.storyId} {initial.storyTitle || "（标题未获取）"}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={styles.row}>
             <Text style={styles.rowLabel}>类型</Text>
             <View style={styles.chips}>
-              {(["story", "task", "bug"] as const).map((item) => (
+              {(initial ? (["task", "bug"] as const) : (["story", "task", "bug"] as const)).map((item) => (
                 <Chip
                   key={item}
                   label={KIND_TITLES[item]}
