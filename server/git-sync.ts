@@ -21,13 +21,22 @@ export interface SyncSettingsAccess {
  *  - 本机/私有标识：项目 ID、派活默认仓库路径
  * 其余（视图、收藏、看板列、关联记录、开关等）作为同步内容
  */
+const EXCLUDED_KEYS = ["token", "syncGitToken", "workspaceIds", "lastRepoPath"] as const;
+
 export function managedValues(values: TapdSettingsValues): Record<string, unknown> {
   const rest = { ...values } as Record<string, unknown>;
-  delete rest.token;
-  delete rest.syncGitToken;
-  delete rest.workspaceIds;
-  delete rest.lastRepoPath;
+  for (const key of EXCLUDED_KEYS) delete rest[key];
   return rest;
+}
+
+/** 硬性红线：推送前校验负载既不含密钥字段、也不含令牌字面值（如被误抄进视图名/收藏），否则中止 */
+function assertSanitizedPayload(managed: Record<string, unknown>, payload: string, values: TapdSettingsValues): void {
+  for (const key of EXCLUDED_KEYS) {
+    if (key in managed) throw new Error(`同步负载包含被排除字段 ${key}，已中止推送`);
+  }
+  for (const secret of [values.token.trim(), values.syncGitToken.trim()].filter(Boolean)) {
+    if (payload.includes(secret)) throw new Error("同步内容疑似包含令牌，已中止推送");
+  }
 }
 
 /** 输出/错误文本中抹掉令牌，避免凭证进入日志或界面 */
@@ -113,7 +122,11 @@ export async function pushSettings(access: SyncSettingsAccess): Promise<string> 
       // 空仓库：在 unborn HEAD 上命名分支后提交，才能产出首个提交
       await runGit(["checkout", "-B", targetBranch], dir, token);
     }
-    await writeFile(join(dir, FILE_NAME), `${JSON.stringify(managedValues(values), null, 2)}\n`, "utf8");
+    const managed = managedValues(values);
+    const payload = `${JSON.stringify(managed, null, 2)}\n`;
+    assertSanitizedPayload(managed, payload, values);
+    // 硬性红线：上面校验不过就中止，永不写入仓库；其余写库过程中不再改动负载原文
+    await writeFile(join(dir, FILE_NAME), payload, "utf8");
     await runGit(["add", FILE_NAME], dir, token);
     const dirty = await runGit(["status", "--porcelain"], dir, token);
     if (!dirty) return "仓库配置已是最新，无变更可推送";
