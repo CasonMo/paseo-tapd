@@ -3,7 +3,7 @@ import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
 import { ScrollView, Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { boardRpc } from "../../shared/contracts";
-import { Chip, HoverTip, formatTime, type WorkbenchTheme } from "./bits";
+import { Chip, formatTime, type WorkbenchTheme } from "./bits";
 import { statusTone, toneColor } from "./status-tones";
 
 type BoardData = RpcOutput<typeof boardRpc>;
@@ -98,8 +98,7 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
   onTogglePinned: () => void;
   onPress: () => void;
 }) {
-  const [cardHover, setCardHover] = useState(false);
-  const styles = useMemo<{ card: ViewStyle; titleRow: ViewStyle; title: TextStyle; meta: ViewStyle; subRow: ViewStyle; sub: TextStyle; storyChip: TextStyle }>(() => ({
+  const styles = useMemo<{ card: ViewStyle; titleRow: ViewStyle; title: TextStyle; idText: TextStyle; meta: ViewStyle; subRow: ViewStyle; sub: TextStyle; storyChip: TextStyle }>(() => ({
     card: {
       backgroundColor: theme.colors.surface1,
       borderColor: theme.colors.border,
@@ -109,46 +108,37 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
       gap: 6,
       opacity: entity.done ? 0.7 : 1,
     },
-    // 带 HoverTip 的行需要整体提级，tip 才能盖住 DOM 靠后的兄弟行
-    titleRow: { flexDirection: "row", alignItems: "center", gap: 6, zIndex: 50 },
+    titleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     title: { color: theme.colors.foreground, fontSize: 13, lineHeight: 18, flex: 1 },
-    meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, zIndex: 49 },
+    idText: { color: theme.colors.foregroundMuted, fontSize: 11 },
+    meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
     subRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     sub: { color: theme.colors.foregroundMuted, fontSize: 11, flex: 1 },
     storyChip: { color: theme.colors.foregroundMuted, fontSize: 10 },
   }), [theme, entity.done]);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={[styles.card, cardHover ? { zIndex: 30 } : null]}
-      onHoverIn={() => setCardHover(true)}
-      onHoverOut={() => setCardHover(false)}
-    >
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.card}>
       <View style={styles.titleRow}>
-        <HoverTip tip={entity.title} theme={theme} style={{ flex: 1 }} top={36}>
-          <Text style={styles.title} numberOfLines={2}>
-            {entity.title}
-          </Text>
-        </HoverTip>
+        <Text style={styles.title} numberOfLines={2}>
+          {entity.title}
+        </Text>
         <Pressable accessibilityRole="button" hitSlop={8} onPress={onTogglePinned}>
           <Icon name="Star" size={15} color={pinned ? theme.colors.accent : theme.colors.foregroundMuted} />
         </Pressable>
       </View>
+      <Text style={styles.idText}>#{entity.id}</Text>
       <View style={styles.meta}>
         {linked ? <Chip label="已关联" theme={theme} color={theme.colors.accent} /> : null}
         {entity.priority ? <Chip label={entity.priority} theme={theme} /> : null}
         {entity.iterationName ? <Chip label={entity.iterationName} theme={theme} /> : null}
         {entity.kind !== "story" && entity.storyTitle ? (
-          <HoverTip tip={`所属需求：${entity.storyTitle}`} theme={theme} style={{ maxWidth: "100%" }} top={30} tipWidth={280}>
-            <Chip label={`需求：${entity.storyTitle}`} theme={theme} tone="muted" style={{ maxWidth: "100%" }} />
-          </HoverTip>
+          <Chip label={`需求：${entity.storyTitle}`} theme={theme} tone="muted" style={{ maxWidth: "100%" }} />
         ) : null}
       </View>
       <View style={styles.subRow}>
         <Text style={styles.sub} numberOfLines={1}>
-          #{entity.id} · {formatTime(entity.modified)}
+          {formatTime(entity.modified)}
           {entity.owner ? ` · ${entity.owner}` : ""}
         </Text>
       </View>
