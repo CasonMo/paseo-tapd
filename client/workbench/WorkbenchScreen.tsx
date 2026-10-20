@@ -1,7 +1,7 @@
 import { usePaseo, useRpc, useSettings } from "@getpaseo/plugin/client";
 import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { agentStatusRpc, boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, updateCheckRpc, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
@@ -9,7 +9,7 @@ import { Chip, ToolbarButton } from "./bits";
 import { BindAgentModal } from "./BindAgentModal";
 import { ColumnPickerModal } from "./ColumnPickerModal";
 import { KindColumn, StatusColumn, type BoardEntityItem } from "./ColumnView";
-import { CreateEntityModal, type CreatedEntity } from "./CreateEntityModal";
+import { CreateEntityModal, type CreateChildPreset, type CreatedEntity } from "./CreateEntityModal";
 import { DispatchModal } from "./DispatchModal";
 import {
   EntityDetailModal,
@@ -49,6 +49,7 @@ function filtersEqual(a: TapdFilters, b: TapdFilters): boolean {
 export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps) {
   const rpc = useRpc(boardRpc);
   const settings = useSettings(tapdSettings);
+  const queryClient = useQueryClient();
   const toast = useToast();
   const [detail, setDetail] = useState<DetailTarget | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -57,6 +58,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   const [saveViewOpen, setSaveViewOpen] = useState(false);
   const [newViewName, setNewViewName] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [createPreset, setCreatePreset] = useState<CreateChildPreset | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("all");
   const [detailVersion, setDetailVersion] = useState(0);
   const [dispatchTarget, setDispatchTarget] = useState<EntityDetailData | null>(null);
@@ -340,6 +342,10 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   }
 
   function handleCreated(created: CreatedEntity) {
+    if (createPreset) {
+      queryClient.invalidateQueries({ queryKey: ["tapd-entity", "story", createPreset.storyId] });
+      setCreatePreset(null);
+    }
     setCreateOpen(false);
     setDetail({ kind: created.kind, id: created.id, title: created.title });
     void board.refetch();
@@ -383,6 +389,16 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     onDispatch: (data) => setDispatchTarget(data),
     onBindAgent: (data) => setBindTarget(data),
     onComment: (data) => setCommentTarget({ kind: data.kind, id: data.id, workspaceId: data.workspaceId }),
+    onCreateChild: (data, childKind) => {
+      setCreatePreset({
+        kind: childKind,
+        storyId: data.id,
+        workspaceId: data.workspaceId ?? "",
+        storyTitle: data.title,
+        storyUrl: data.url,
+      });
+      setCreateOpen(true);
+    },
     onStatus: (data) => setStatusTarget({ kind: data.kind, id: data.id, current: data.status, workspaceId: data.workspaceId }),
     onOpenEntity: (target) => setDetail(target),
   };
@@ -583,7 +599,16 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
         <EntityDetailOverlay target={detail} onClose={() => setDetail(null)} theme={theme} extras={detailExtras} />
       ) : null}
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} theme={theme} />
-      <CreateEntityModal open={createOpen} onClose={() => setCreateOpen(false)} theme={theme} onCreated={handleCreated} />
+        <CreateEntityModal
+          open={createOpen}
+          initial={createPreset}
+          onClose={() => {
+            setCreateOpen(false);
+            setCreatePreset(null);
+          }}
+          theme={theme}
+          onCreated={handleCreated}
+        />
       {dispatchTarget ? (
         <DispatchModal
           open
