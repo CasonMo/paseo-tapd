@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { rm, readFile, writeFile } from "node:fs/promises";
+import { rm, readFile, writeFile, lstat, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { TapdSettingsValues } from "../shared/contracts";
@@ -125,8 +125,12 @@ export async function pushSettings(access: SyncSettingsAccess): Promise<string> 
     const managed = managedValues(values);
     const payload = `${JSON.stringify(managed, null, 2)}\n`;
     assertSanitizedPayload(managed, payload, values);
-    // 硬性红线：上面校验不过就中止，永不写入仓库；其余写库过程中不再改动负载原文
-    await writeFile(join(dir, FILE_NAME), payload, "utf8");
+    // 文件安全：仓库若把设置文件做成符号链接，写入会跟着链接改到外部文件，
+    // 且 git 视角仍是干净树（误报无变更）。先删链接本体，再按普通文件写入。
+    const settingsPath = join(dir, FILE_NAME);
+    const existing = await lstat(settingsPath).catch(() => null);
+    if (existing?.isSymbolicLink()) await unlink(settingsPath);
+    await writeFile(settingsPath, payload, "utf8");
     await runGit(["add", FILE_NAME], dir, token);
     const dirty = await runGit(["status", "--porcelain"], dir, token);
     if (!dirty) return "仓库配置已是最新，无变更可推送";

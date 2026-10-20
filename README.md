@@ -13,7 +13,7 @@ A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo works
 - Dispatch to an agent: pick a repository and provider/model; the plugin creates a worktree workspace and starts an agent preloaded with the item snapshot, then tracks it from the card
 - Write back to TAPD: comments (plain text converted to HTML), workflow status changes, and new item creation
 - Attachment source: search TAPD items while composing a prompt and attach a snapshot
-- Agent binding: pick an agent from the item detail window to link it to the item; the bound agent receives a short follow-up notice with the item snapshot, and agent sessions receive the TAPD environment variables (when not already defined) so a linked agent can query and update TAPD
+- Agent binding: pick an agent from the item detail window to link it to the item; the prompt is prefilled with a default notice (editable) so sending notifies the agent — clear the field to bind silently; agent sessions still receive the TAPD environment variables (when not already defined) so a linked agent can query and update TAPD
 - Settings sync via Git: point the plugin at your own Git repository (URL + access token in settings) and push a backup, or pull to restore views, favorites, board columns, item↔agent links, and switches after uninstall/reinstall; the synced file is `tapd-workbench-settings.json`; privacy-sensitive fields never leave the machine: the TAPD token, project IDs, the Git token, and the local dispatch repo path
 - Update check: when the registry pins a newer version, the workbench shows a top banner with the update command (`paseo plugin update tapd-workbench`)
 
@@ -38,7 +38,7 @@ Use "Test connection" in the plugin settings to verify.
 
 ## Agent binding
 
-Pick an agent from the item detail window to link the item to that conversation. The bound agent receives a short follow-up notice with the item snapshot, and agent sessions receive the TAPD connection variables when they are not already defined so the agent can query and update TAPD.
+Pick an agent from the item detail window to link the item to that conversation. The prompt comes prefilled with a default notice and is editable — send it as-is, amend it, or clear it to only create the link. Agent sessions receive the TAPD connection variables when they are not already defined so the agent can query and update TAPD.
 
 ## Security
 
@@ -84,7 +84,7 @@ MIT
 - Agent 自动回评：设置 → Agent 开关打开后，派给已关联单据的 Agent 每跑完一轮，自动把结果摘要作为评论写回该单据（默认关闭）
 - 回写 TAPD：评论（纯文本自动转 HTML）、工作流状态变更、新建单据
 - 附件源：撰写提示词时搜索 TAPD 单据并附上快照
-- Agent 绑定：在单据详情浮窗中选择一个 Agent 关联该单据；绑定后该 Agent 会收到一条带单据快照的简短跟进提示，Agent 会话会在未定义时注入 TAPD 环境变量，使其可直接查询与更新 TAPD
+- Agent 绑定：在单据详情浮窗中选择一个 Agent 关联该单据；提示词默认填入标准跟进通知，可直接发送、修改后发送，或清空只绑定；Agent 会话会在未定义时注入 TAPD 环境变量，使其可直接查询与更新 TAPD
 - 配置同步（Git）：在设置里填自己的 Git 仓库地址与访问令牌，可把视图 / 收藏 / 看板列 / 单据关联记录 / 开关等设置一键推送备份，或从仓库拉取恢复（卸载重装后凭此找回关联）；同步文件为仓库根目录的 `tapd-workbench-settings.json`，隐私字段不出本机：TAPD Token、项目 ID、Git 令牌、派活仓库路径均不参与同步
 - 更新检查：registry 固定到新版本时，工作台顶部显示带更新命令的横幅（`paseo plugin update tapd-workbench`）
 

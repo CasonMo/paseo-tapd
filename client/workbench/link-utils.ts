@@ -22,8 +22,8 @@ export function makeLink(input: {
   };
 }
 
-/** 绑定后发给 Agent 的跟进提示词 */
-export function bindNoticeText(input: {
+/** 默认的关联跟进提示词（可插入到提示框中，由用户修改后再发送） */
+export function defaultBindNotice(input: {
   kind: EntityKind;
   id: string;
   title: string;
@@ -44,7 +44,7 @@ interface AgentSender {
   };
 }
 
-/** 发送关联提示词（失败不阻断绑定） */
+/** 发送提示词（失败不阻断绑定） */
 export async function notifyAgent(paseo: AgentSender, agentId: string, text: string): Promise<boolean> {
   if (!agentId) return false;
   try {

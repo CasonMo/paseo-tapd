@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, Text, View, type TextStyle, type ViewStyl
 import { type TapdLink } from "../../shared/contracts";
 import { Chip, type WorkbenchTheme } from "./bits";
 import { type EntityDetailData } from "./EntityDetailModal";
-import { bindNoticeText, makeLink, notifyAgent } from "./link-utils";
+import { defaultBindNotice, makeLink, notifyAgent } from "./link-utils";
 
 interface AgentRow {
   id: string;
@@ -31,6 +31,7 @@ export function BindAgentModal({ open, onClose, theme, data, links, onBound }: {
   const [error, setError] = useState<string | null>(null);
   const [bindingId, setBindingId] = useState("");
   const [query, setQuery] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -39,6 +40,7 @@ export function BindAgentModal({ open, onClose, theme, data, links, onBound }: {
     setError(null);
     setBindingId("");
     setQuery("");
+    setNotice(defaultBindNotice({ kind: data.kind, id: data.id, title: data.title, statusLabel: data.statusLabel, url: data.url }));
     void (async () => {
       try {
         const result = await paseo.agents.list({
@@ -91,7 +93,6 @@ export function BindAgentModal({ open, onClose, theme, data, links, onBound }: {
     if (bindingId) return;
     setBindingId(agent.id);
     try {
-      const notice = bindNoticeText({ kind: data.kind, id: data.id, title: data.title, statusLabel: data.statusLabel, url: data.url });
       const link = makeLink({
         kind: data.kind,
         id: data.id,
@@ -100,11 +101,8 @@ export function BindAgentModal({ open, onClose, theme, data, links, onBound }: {
         agentTitle: agent.title,
       });
       onBound(link);
-      const notified = await notifyAgent(
-        paseo,
-        agent.id,
-        notice,
-      );
+      const prompt = notice.trim();
+      const notified = prompt ? await notifyAgent(paseo, agent.id, prompt) : false;
       toast.show(notified ? `已关联并通知「${agent.title}」` : `已关联「${agent.title}」`, { variant: "success" });
       onClose();
     } finally {
@@ -121,6 +119,7 @@ export function BindAgentModal({ open, onClose, theme, data, links, onBound }: {
     error: TextStyle;
     center: ViewStyle;
     input: TextStyle;
+    noticeInput: TextStyle;
   }>(() => ({
     row: {
       flexDirection: "row",
@@ -147,12 +146,26 @@ export function BindAgentModal({ open, onClose, theme, data, links, onBound }: {
       color: theme.colors.foreground,
       fontSize: 13,
     },
+    noticeInput: {
+      height: 84,
+      textAlignVertical: "top",
+      paddingTop: 8,
+      marginBottom: 4,
+    },
   }), [theme]);
 
   return (
     <Modal title={`绑定 Agent · #${data.id}`} open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <Modal.Content>
-        <Text style={styles.hint}>选择一个已有 Agent 关联到这张单据；绑定后会向它发送一条跟进提示词。</Text>
+        <Text style={styles.hint}>选择已有 Agent 关联这张单据；提示词已默认填好，可修改后发送，不发送就清空。</Text>
+        <TextInput
+          style={[styles.input, styles.noticeInput]}
+          placeholder="提示词：会发送给该 Agent；清空则只建立关联不发送"
+          placeholderTextColor={theme.colors.foregroundMuted}
+          multiline
+          value={notice}
+          onChangeText={setNotice}
+        />
         <TextInput
           style={styles.input}
           placeholder="搜索 Agent（标题 / 模型 / ID）"
@@ -193,7 +206,7 @@ export function BindAgentModal({ open, onClose, theme, data, links, onBound }: {
                 ) : bindingId === agent.id ? (
                   <ActivityIndicator color={theme.colors.accent} />
                 ) : (
-                  <Text style={styles.link}>绑定并通知</Text>
+                  <Text style={styles.link}>关联</Text>
                 )}
               </Pressable>
             );

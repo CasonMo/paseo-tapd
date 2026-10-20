@@ -8,7 +8,7 @@ Opening an item shows status, owner, creator, iteration, description, and recent
 
 Workflow features: dispatch an item to a coding agent by picking a repository and provider/model; the plugin creates a worktree workspace and starts an agent whose prompt contains the item snapshot. Dispatched workspaces and agents are tracked from the item and the card. The plugin can write a comment back to TAPD (plain text converted to HTML), change the item's workflow status, and create new stories, tasks, or bugs from the board.
 
-An item can also be linked to an existing agent from the item detail window. After binding, the agent receives a short notice message with the item snapshot, and the link is tracked on the card and in the detail window. The workbench surfaces the linked agent's live status: the "Linked" chip on a card carries a colored dot, and the detail window's link rows show the status label, a timestamp, and the latest turn result (short summary, or the error message for failed turns); updates arrive through the daemon's agent event stream with a short throttle. A settings toggle (Settings → Agent, off by default) makes the daemon record each agent turn result and, when the toggle is on and the agent is linked to an item, automatically post the result summary as a TAPD comment through the same comment channel.
+An item can also be linked to an existing agent from the item detail window. The prompt dialog comes prefilled with a default notice — editable before sending; clearing it binds without sending — and the link is tracked on the card and in the detail window. The workbench surfaces the linked agent's live status: the "Linked" chip on a card carries a colored dot, and the detail window's link rows show the status label, a timestamp, and the latest turn result (short summary, or the error message for failed turns); updates arrive through the daemon's agent event stream with a short throttle. A settings toggle (Settings → Agent, off by default) makes the daemon record each agent turn result and, when the toggle is on and the agent is linked to an item, automatically post the result summary as a TAPD comment through the same comment channel.
 
 Agent sessions receive the TAPD connection variables (TAPD_TOKEN, TAPD_API_ENDPOINT, TAPD_SITE_URL, TAPD_WORKSPACE_IDS) when they are not already defined, so a linked agent can call the TAPD OpenAPI directly.
 
@@ -32,7 +32,7 @@ TAPD 工作台把 TAPD（需求、任务、缺陷）带进 Paseo。
 
 工作流能力：选择仓库与 provider/model，可把单据派给一个编码 Agent；插件创建 worktree 工作区并启动一个提示词中包含单据快照的 Agent，派发的工作区与 Agent 可从单据和卡片追踪。插件可以把评论回写 TAPD（纯文本转 HTML）、变更单据工作流状态，并在看板上新建需求、任务或缺陷。
 
-单据也可在详情浮窗中关联到一个已有 Agent。绑定后，该 Agent 会收到一条带单据快照的简短通知消息，卡片与详情浮窗都会记录这个关联。工作台会展示该 Agent 的实时状态：卡片「已关联」标签内带状态圆点，详情浮窗的关联行显示状态文字、最近状态时间与最近一次工作结果（简短摘要，失败时显示错误信息）；更新经 daemon 的 agent 事件流推送（带短暂节流）。设置 → Agent 提供「完成工作后自动回写 TAPD 评论」开关（默认关闭）：打开后 daemon 记录每次 turn 结果，并在该 Agent 关联了单据时，通过与手动评论相同的 TAPD 评论通道自动把结果摘要写回单据。
+单据也可在详情浮窗中关联到一个已有 Agent。提示词默认填入标准跟进通知，可编辑后发送，也可清空只绑定；卡片与详情浮窗都会记录这个关联。工作台会展示该 Agent 的实时状态：卡片「已关联」标签内带状态圆点，详情浮窗的关联行显示状态文字、最近状态时间与最近一次工作结果（简短摘要，失败时显示错误信息）；更新经 daemon 的 agent 事件流推送（带短暂节流）。设置 → Agent 提供「完成工作后自动回写 TAPD 评论」开关（默认关闭）：打开后 daemon 记录每次 turn 结果，并在该 Agent 关联了单据时，通过与手动评论相同的 TAPD 评论通道自动把结果摘要写回单据。
 
 Agent 会话在相关变量尚未定义时会收到 TAPD 连接变量（TAPD_TOKEN、TAPD_API_ENDPOINT、TAPD_SITE_URL、TAPD_WORKSPACE_IDS），从而可直接调用 TAPD OpenAPI。
 
