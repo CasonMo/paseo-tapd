@@ -1,6 +1,8 @@
+import type { PluginHandlerContext } from "@getpaseo/plugin/server";
 import type { RpcInput, RpcOutput } from "@getpaseo/plugin";
-import type { addCommentRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, updateCheckRpc, updateStatusRpc } from "../shared/contracts";
+import type { addCommentRpc, agentStatusRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, updateCheckRpc, updateStatusRpc } from "../shared/contracts";
 import { DEFAULT_FILTERS, type EntityKind, type TapdSettingsValues } from "../shared/contracts";
+import { getTurnRecord, type AgentTurnRecord } from "./agent-state";
 import {
   addComment,
   createEntity,
@@ -199,6 +201,64 @@ export function createHandlers(getValues: GetValues) {
 
     async updateCheck(): Promise<RpcOutput<typeof updateCheckRpc>> {
       return checkForUpdate();
+    },
+
+    async agentStatus(
+      input: RpcInput<typeof agentStatusRpc>,
+      context: PluginHandlerContext,
+    ): Promise<RpcOutput<typeof agentStatusRpc>> {
+      const ids = [...new Set(input.agentIds.map((id) => id.trim()).filter(Boolean))].slice(0, 100);
+      const agents = new Map<string, { status: string; updatedAt: string }>();
+      if (ids.length > 0) {
+        try {
+          const list = await context.paseo.agents.list({ page: { limit: 200 }, filter: { includeArchived: true } });
+          for (const entry of list.entries) {
+            if (ids.includes(entry.agent.id)) {
+              agents.set(entry.agent.id, { status: entry.agent.status, updatedAt: entry.agent.updatedAt });
+            }
+          }
+        } catch {
+          // daemon 查询失败仅缺实时状态，不阻塞详情面板
+        }
+      }
+      return {
+        items: ids.map((agentId) => {
+          const live = agents.get(agentId);
+          const record = getTurnRecord(agentId);
+          return {
+            agentId,
+            status: live?.status ?? "",
+            updatedAt: live?.updatedAt ?? "",
+            turnOutcome: record?.outcome ?? "",
+            turnEndedAt: record?.endedAt ?? "",
+            turnSummary: record?.summary ?? "",
+            turnError: record?.error ?? "",
+          };
+        }),
+      };
+    },
+
+    /** turn_ended 钩子触发：开关打开且该 agent 关联了 TAPD 单据时，自动回写一条结果评论。 */
+    async autoReportAfterTurn(input: { agentId: string; record: AgentTurnRecord }): Promise<void> {
+      try {
+        const values = await getValues();
+        if (!values.autoReportAgentResult) return;
+        const link = values.links.find((item) => item.agentId === input.agentId);
+        if (!link) return;
+        const config = resolveConfig(values);
+        if (config.token.length === 0 || config.workspaceIds.length === 0) return;
+        const header =
+          input.record.outcome === "failed"
+            ? "Agent 结果反馈：执行失败"
+            : input.record.outcome === "canceled"
+              ? "Agent 结果反馈：已取消"
+              : "Agent 结果反馈：已完成";
+        const text = [header, input.record.error || input.record.summary].filter(Boolean).join("\n");
+        const me = await fetchMe(config).catch(() => null);
+        await addComment(config, link.workspaceId, link.kind, link.id, text, me?.nick ?? "");
+      } catch {
+        // 自动回评失败不打扰用户（无 UI 处），静默
+      }
     },
   };
 }

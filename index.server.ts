@@ -1,6 +1,7 @@
 import type { PluginServerContext } from "@getpaseo/plugin/server";
-import { addCommentRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, tapdSettings, updateCheckRpc, updateStatusRpc } from "./shared/contracts";
+import { addCommentRpc, agentStatusRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, tapdSettings, updateCheckRpc, updateStatusRpc } from "./shared/contracts";
 import { createHandlers } from "./server/handlers";
+import { recordTurnEnd } from "./server/agent-state";
 import { clearTapdCache } from "./server/tapd";
 
 export default function contribute(server: PluginServerContext) {
@@ -23,6 +24,7 @@ export default function contribute(server: PluginServerContext) {
   server.handle(filterFieldsRpc, handlers.filterFields);
   server.handle(checkRpc, handlers.check);
   server.handle(updateCheckRpc, handlers.updateCheck);
+  server.handle(agentStatusRpc, handlers.agentStatus);
 
   const unsubscribe = settings.subscribe(() => {
     clearTapdCache();
@@ -49,6 +51,18 @@ export default function contribute(server: PluginServerContext) {
     if (site && !env.TAPD_SITE_URL) env.TAPD_SITE_URL = site;
     if (workspaces && !env.TAPD_WORKSPACE_IDS) env.TAPD_WORKSPACE_IDS = workspaces;
     return { ...request, env };
+  });
+
+  // Agent turn 结束：记台账；开关打开且该 agent 关联了 TAPD 单据时自动回写评论
+  server.on("agent.turn_ended", async (event) => {
+    if (!event.agent.id) return;
+    const record = recordTurnEnd({
+      agentId: event.agent.id,
+      outcome: event.outcome,
+      endedAt: new Date().toISOString(),
+      timeline: event.timeline,
+    });
+    void handlers.autoReportAfterTurn({ agentId: event.agent.id, record });
   });
 
   console.log("[tapd-workbench] server ready");

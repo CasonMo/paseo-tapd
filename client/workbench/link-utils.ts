@@ -37,7 +37,7 @@ export function bindNoticeText(input: {
   return [
     `【TAPD 关联】本会话已与 TAPD ${KIND_LABELS[input.kind]} #${input.id}「${input.title}」建立关联${status}。`,
     `链接：${input.url}`,
-    "后续请围绕这张单据跟进；完成阶段性工作后，可在 Paseo 的「TAPD 工作台」将结论回写到单据评论或更新状态。",
+    "后续请围绕这张单据跟进；每轮工作结束后，请在回复最后给出一段结果摘要（改动内容、验证结果），插件会把摘要自动回写到这张单据的评论。",
   ].join("\n");
 }
 

@@ -3,7 +3,8 @@ import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
 import { ScrollView, Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { boardRpc } from "../../shared/contracts";
-import { Chip, formatTime, type WorkbenchTheme } from "./bits";
+import { Chip, agentStatusColor, formatTime, type WorkbenchTheme } from "./bits";
+import type { AgentStatusItem } from "./EntityDetailModal";
 import { statusTone, toneColor } from "./status-tones";
 
 type BoardData = RpcOutput<typeof boardRpc>;
@@ -25,7 +26,7 @@ interface CardActions {
 }
 
 /** 看板状态列：一列 = 一个状态 */
-export function StatusColumn({ kind, status, label, items, theme, width, favorites, linkedKeys, onToggleFavorite, onOpen }: {
+export function StatusColumn({ kind, status, label, items, theme, width, favorites, linkedKeys, statusByKey, onToggleFavorite, onOpen }: {
   kind: BoardEntityItem["kind"];
   status: string;
   label: string;
@@ -34,6 +35,7 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
   width: number;
   favorites: readonly string[];
   linkedKeys: readonly string[];
+  statusByKey: ReadonlyMap<string, AgentStatusItem>;
   onToggleFavorite: (key: string) => void;
   onOpen: (entity: BoardEntityItem) => void;
 }) {
@@ -80,6 +82,7 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
               theme={theme}
               pinned={favorites.includes(entityKey(item))}
               linked={linkedKeys.includes(entityKey(item))}
+              status={statusByKey.get(entityKey(item))}
               onTogglePinned={() => onToggleFavorite(entityKey(item))}
               onPress={() => onOpen(item)}
             />
@@ -90,11 +93,12 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
   );
 }
 
-function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: {
+function EntityCard({ entity, theme, pinned, linked, status, onTogglePinned, onPress }: {
   entity: BoardEntityItem;
   theme: WorkbenchTheme;
   pinned: boolean;
   linked: boolean;
+  status?: AgentStatusItem;
   onTogglePinned: () => void;
   onPress: () => void;
 }) {
@@ -129,7 +133,14 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
       </View>
       <Text style={styles.idText}>#{entity.id}</Text>
       <View style={styles.meta}>
-        {linked ? <Chip label="已关联" theme={theme} color={theme.colors.accent} /> : null}
+        {linked ? (
+          <Chip
+            label="已关联"
+            theme={theme}
+            color={theme.colors.accent}
+            dot={status?.status ? agentStatusColor(status.status, theme) : undefined}
+          />
+        ) : null}
         {entity.priority ? <Chip label={entity.priority} theme={theme} /> : null}
         {entity.iterationName ? <Chip label={entity.iterationName} theme={theme} /> : null}
         {entity.kind !== "story" && entity.storyTitle ? (
@@ -153,7 +164,7 @@ type ListEntry =
   | { type: "header"; entryKey: string; group: GroupInfo }
   | { type: "card"; entryKey: string; item: BoardEntityItem };
 
-export function KindColumn({ kind, label, items, total, truncated, theme, flex, width, emptyText, grouped, favorites, linkedKeys, onToggleFavorite, onOpen }: {
+export function KindColumn({ kind, label, items, total, truncated, theme, flex, width, emptyText, grouped, favorites, linkedKeys, statusByKey, onToggleFavorite, onOpen }: {
   kind: BoardEntityItem["kind"];
   label: string;
   items: BoardEntityItem[];
@@ -166,6 +177,7 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
   grouped: boolean;
   favorites: readonly string[];
   linkedKeys: readonly string[];
+  statusByKey: ReadonlyMap<string, AgentStatusItem>;
   onToggleFavorite: (key: string) => void;
   onOpen: (entity: BoardEntityItem) => void;
 }) {
@@ -273,6 +285,7 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
                 theme={theme}
                 pinned={favorites.includes(entry.entryKey)}
                 linked={linkedKeys.includes(entry.entryKey)}
+                status={statusByKey.get(entry.entryKey)}
                 onTogglePinned={() => onToggleFavorite(entry.entryKey)}
                 onPress={() => onOpen(entry.item)}
               />

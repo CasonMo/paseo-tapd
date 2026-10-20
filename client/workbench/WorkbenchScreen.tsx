@@ -1,10 +1,10 @@
-import { useRpc, useSettings } from "@getpaseo/plugin/client";
+import { usePaseo, useRpc, useSettings } from "@getpaseo/plugin/client";
 import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
-import { boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, updateCheckRpc, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
+import { agentStatusRpc, boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, updateCheckRpc, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
 import { Chip, ToolbarButton } from "./bits";
 import { BindAgentModal } from "./BindAgentModal";
 import { ColumnPickerModal } from "./ColumnPickerModal";
@@ -14,6 +14,7 @@ import { DispatchModal } from "./DispatchModal";
 import {
   EntityDetailModal,
   EntityDetailOverlay,
+  type AgentStatusItem,
   type DetailExtras,
   type DetailTarget,
   type EntityDetailData,
@@ -23,6 +24,7 @@ import { FilterBar } from "./FilterBar";
 import { SettingsModal } from "./SettingsForm";
 
 const KINDS = ["story", "task", "bug"] as const;
+const EMPTY_LINKS: readonly TapdLink[] = [];
 
 const KIND_TITLES: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
 
@@ -65,6 +67,51 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   const [bindTarget, setBindTarget] = useState<EntityDetailData | null>(null);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [boardHeight, setBoardHeight] = useState(0);
+
+  // 关联 Agent 的实时状态（卡片圆点 + 详情面板共用数据源）
+  const paseo = usePaseo();
+  const statusRpc = useRpc(agentStatusRpc);
+  const linksReady = settings.status === "ready" ? settings.values.links : EMPTY_LINKS;
+  const agentIds = useMemo(
+    () => [...new Set(linksReady.map((link) => link.agentId).filter(Boolean))],
+    [linksReady],
+  );
+  const [agentStatusMap, setAgentStatusMap] = useState<Map<string, AgentStatusItem>>(new Map());
+  const lastStatusFetch = useRef(0);
+  const fetchAgentStatus = useCallback(() => {
+    if (agentIds.length === 0) {
+      setAgentStatusMap(new Map());
+      return;
+    }
+    lastStatusFetch.current = Date.now();
+    void statusRpc({ agentIds })
+      .then((result) => {
+        const next = new Map<string, AgentStatusItem>();
+        for (const item of result.items ?? []) next.set(item.agentId, item);
+        setAgentStatusMap(next);
+      })
+      .catch(() => {});
+  }, [agentIds, statusRpc]);
+  useEffect(() => {
+    fetchAgentStatus();
+  }, [fetchAgentStatus]);
+  useEffect(() => {
+    if (agentIds.length === 0) return;
+    return paseo.agents.subscribe(() => {
+      if (Date.now() - lastStatusFetch.current < 2000) return;
+      fetchAgentStatus();
+    });
+  }, [paseo, agentIds, fetchAgentStatus]);
+  // entityKey -> 首个关联 agent 的状态
+  const statusByKey = useMemo(() => {
+    const map = new Map<string, AgentStatusItem>();
+    for (const link of linksReady) {
+      if (!link.agentId || map.has(link.key)) continue;
+      const status = agentStatusMap.get(link.agentId);
+      if (status) map.set(link.key, status);
+    }
+    return map;
+  }, [linksReady, agentStatusMap]);
 
   useEffect(() => {
     if (settings.status === "ready" && filters === null) {
@@ -425,6 +472,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                       grouped={groupByStatus}
                       favorites={favorites}
                       linkedKeys={linkedKeys}
+                      statusByKey={statusByKey}
                        onToggleFavorite={(key) => void toggleFavorite(key)}
                        onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
                      />
@@ -448,6 +496,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                     grouped={groupByStatus}
                     favorites={favorites}
                     linkedKeys={linkedKeys}
+                    statusByKey={statusByKey}
                     onToggleFavorite={(key) => void toggleFavorite(key)}
                     onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
                   />
@@ -476,6 +525,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                     width={layout.compact ? 252 : 300}
                     favorites={favorites}
                     linkedKeys={linkedKeys}
+                    statusByKey={statusByKey}
                     onToggleFavorite={(key) => void toggleFavorite(key)}
                     onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
                   />

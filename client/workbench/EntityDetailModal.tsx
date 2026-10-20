@@ -1,11 +1,11 @@
 import type { RpcOutput } from "@getpaseo/plugin";
-import { openExternalUrl, useRpc, type PluginScreenProps } from "@getpaseo/plugin/client";
+import { openExternalUrl, usePaseo, useRpc, type PluginScreenProps } from "@getpaseo/plugin/client";
 import { Icon, Modal, copyText, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type TextStyle, type ViewStyle } from "react-native";
-import { entityRpc, type EntityKind, type TapdLink } from "../../shared/contracts";
-import { Chip, HoverTip, formatTime, type WorkbenchTheme } from "./bits";
+import { agentStatusRpc, entityRpc, type EntityKind, type TapdLink } from "../../shared/contracts";
+import { Chip, HoverTip, agentStatusColor, formatTime, formatIsoTime, type WorkbenchTheme } from "./bits";
 import { statusTone, toneColor } from "./status-tones";
 
 export interface DetailTarget {
@@ -15,6 +15,7 @@ export interface DetailTarget {
 }
 
 export type EntityDetailData = RpcOutput<typeof entityRpc>;
+export type AgentStatusItem = NonNullable<RpcOutput<typeof agentStatusRpc>["items"]>[number];
 
 export interface DetailExtras {
   links: readonly TapdLink[];
@@ -132,6 +133,54 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
     staleTime: 60_000,
     retry: 1,
   });
+
+  const agentIds = useMemo(() => {
+    if (!open || id === "") return [];
+    return [
+      ...new Set(
+        extras.links
+          .filter((link) => link.key === `${kind}-${id}` && link.agentId.trim().length > 0)
+          .map((link) => link.agentId),
+      ),
+    ];
+  }, [open, id, kind, extras.links]);
+
+  const statusRpc = useRpc(agentStatusRpc);
+  const paseo = usePaseo();
+  const [agentStatusMap, setAgentStatusMap] = useState<Map<string, AgentStatusItem>>(new Map());
+  const lastStatusFetch = useRef(0);
+
+  const fetchAgentStatus = useCallback(() => {
+    if (agentIds.length === 0) return;
+    lastStatusFetch.current = Date.now();
+    void statusRpc({ agentIds })
+      .then((result) => {
+        const next = new Map<string, AgentStatusItem>();
+        for (const item of result.items ?? []) next.set(item.agentId, item);
+        setAgentStatusMap(next);
+      })
+      .catch(() => {
+        // 状态查询失败不影响详情其余内容
+      });
+  }, [agentIds, statusRpc]);
+
+  // 打开面板 / 关联变化时取一次
+  useEffect(() => {
+    if (agentIds.length === 0) {
+      setAgentStatusMap(new Map());
+      return;
+    }
+    fetchAgentStatus();
+  }, [agentIds, fetchAgentStatus]);
+
+  // agent 事件流 → 节流重拉（实时状态点）
+  useEffect(() => {
+    if (agentIds.length === 0) return;
+    return paseo.agents.subscribe(() => {
+      if (Date.now() - lastStatusFetch.current < 2000) return;
+      fetchAgentStatus();
+    });
+  }, [paseo, agentIds, fetchAgentStatus]);
 
   const styles = useMemo<{
     actions: ViewStyle;
@@ -325,6 +374,7 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
                 link={link}
                 theme={theme}
                 extras={extras}
+                status={agentStatusMap.get(link.agentId)}
               />
             ))}
           </>
@@ -498,14 +548,16 @@ function ChildListSection({ label, items, totalHint, theme, extras }: {
   );
 }
 
-/** 关联 Agent 行：悬停/点击展示保存的提示词前 200 字 */
-function AgentLinkRow({ link, theme, extras }: {
+/** 关联 Agent 行：悬停/点击展示保存的提示词前 200 字；展示 agent 实时状态与最近一次 turn 结果 */
+function AgentLinkRow({ link, theme, extras, status }: {
   link: TapdLink;
   theme: WorkbenchTheme;
   extras: DetailExtras;
+  status?: AgentStatusItem;
 }) {
   const [hovering, setHovering] = useState(false);
   const [pinned, setPinned] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
   const title = useMemo(() => {
     const base = link.agentTitle || link.workspaceTitle || "";
     return base.length > 40 ? `${base.slice(0, 40)}…` : base;
@@ -554,6 +606,38 @@ function AgentLinkRow({ link, theme, extras }: {
 
   const snippet = link.promptSnippet.trim();
 
+  const liveStatus = status?.status ?? "";
+  const statusColor = agentStatusColor(liveStatus, theme);
+  const statusLabel =
+    liveStatus === "running"
+      ? "运行中"
+      : liveStatus === "idle"
+        ? "空闲"
+        : liveStatus === "initializing"
+          ? "启动中"
+          : liveStatus === "error"
+            ? "异常"
+            : liveStatus === "closed"
+              ? "已关闭"
+              : "";
+  const hasTurn = Boolean(status?.turnOutcome);
+  const turnedAt = formatIsoTime(status?.turnEndedAt ?? "");
+  const turnLabel =
+    status?.turnOutcome === "completed"
+      ? "上次完成"
+      : status?.turnOutcome === "failed"
+        ? "上次失败"
+        : status?.turnOutcome === "canceled"
+          ? "上次取消"
+          : "";
+  const turnText = (status?.turnError || status?.turnSummary || "").trim();
+  const turnColor =
+    status?.turnOutcome === "failed"
+      ? theme.colors.statusDanger
+      : status?.turnOutcome === "canceled"
+        ? theme.colors.foregroundMuted
+        : theme.colors.statusSuccess;
+
   return (
     <View>
       <Pressable
@@ -593,6 +677,48 @@ function AgentLinkRow({ link, theme, extras }: {
           <Text style={styles.tipText} selectable>
             {snippet || "（该绑定创建于旧版本，未记录提示词）"}
           </Text>
+        </View>
+      ) : null}
+      {link.agentId && (liveStatus || hasTurn) ? (
+        <View style={{ paddingLeft: 10, paddingTop: resultOpen ? 0 : 4 }}>
+          {liveStatus ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor: statusColor,
+                }}
+              />
+              <Text style={{ color: theme.colors.foregroundMuted, fontSize: 11 }}>
+                {statusLabel}
+                {status?.updatedAt ? ` · ${formatIsoTime(status.updatedAt)}` : ""}
+              </Text>
+            </View>
+          ) : null}
+          {hasTurn && turnLabel ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="查看上次结果"
+              onPress={() => setResultOpen((value) => !value)}
+              style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingTop: 2 }}
+            >
+              <Icon name={resultOpen ? "ChevronDown" : "ChevronRight"} size={11} color={turnColor} />
+              <Text style={{ color: turnColor, fontSize: 11, flexShrink: 1 }} numberOfLines={resultOpen ? undefined : 1}>
+                {turnLabel}
+                {turnedAt ? ` ${turnedAt}` : ""}
+                {!resultOpen && turnText ? ` · ${turnText}` : ""}
+              </Text>
+            </Pressable>
+          ) : null}
+          {hasTurn && resultOpen && turnText ? (
+            <View style={{ ...styles.tipBox, position: "relative", top: undefined, left: undefined, right: undefined, marginTop: 4 }}>
+              <Text style={styles.tipText} selectable>
+                {turnText}
+              </Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
     </View>

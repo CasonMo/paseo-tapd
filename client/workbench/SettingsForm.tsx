@@ -9,6 +9,7 @@ import {
   SettingsInput,
   SettingsRow,
   SettingsSection,
+  SettingsSwitch,
 } from "@getpaseo/plugin/client/ui";
 import { checkRpc, tapdSettings } from "../../shared/contracts";
 import { PLUGIN_VERSION } from "../../shared/version";
@@ -127,6 +128,25 @@ function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: W
         </SettingsCard>
       </SettingsSection>
       <ViewsSection theme={theme} settings={settings} />
+      <SettingsSection title="Agent">
+        <SettingsCard>
+          <SettingsSwitch
+            label="完成工作后自动回写 TAPD 评论"
+            hint="每次派给 TAPD 单据的 Agent 完成一轮 turn 后，把结果摘要作为评论写回该单据。仅对已关联的单据生效。"
+            value={settings.values.autoReportAgentResult}
+            onValueChange={(value) => {
+              void (async () => {
+                const ok = await settings.save(
+                  { ...settings.values, autoReportAgentResult: value },
+                  settings.revision,
+                );
+                if (ok) toast.show(value ? "已开启自动回写评论" : "已关闭自动回写评论", { variant: "success" });
+                else toast.error(settings.saveError ?? "保存失败，请重试");
+              })();
+            }}
+          />
+        </SettingsCard>
+      </SettingsSection>
       <SettingsSection title="操作">
         <SettingsCard>
           <SettingsAction

@@ -106,6 +106,8 @@ export const tapdSettingsSchema = z.object({
   /** 上次派活使用的仓库与模型（默认值） */
   lastRepoPath: z.string().default(""),
   lastProvider: z.string().default(""),
+  /** Agent 完成工作后自动回写 TAPD 评论（默认关，避免到处刷评论） */
+  autoReportAgentResult: z.boolean().default(false),
 });
 export type TapdLink = TapdSettingsValues["links"][number];
 export type TapdSettingsValues = z.infer<typeof tapdSettingsSchema>;
@@ -113,7 +115,7 @@ export type TapdSettingsValues = z.infer<typeof tapdSettingsSchema>;
 export const tapdSettings = defineSettings({
   id: "tapd-workbench-config",
   scope: "host",
-  version: 5,
+  version: 6,
   schema: tapdSettingsSchema,
   migrate: (values, fromVersion) => {
     const previous = (values ?? {}) as Record<string, unknown>;
@@ -436,6 +438,25 @@ export const updateCheckRpc = defineRpc({
     latestCommit: z.string(),
     updateAvailable: z.boolean(),
     checkedAt: z.string(),
+  }),
+});
+
+/** Agent 状态 + 最近一次 turn 结果（详情面板展示用） */
+export const agentStatusRpc = defineRpc({
+  name: "tapd.agent_status",
+  input: z.object({ agentIds: z.array(z.string()).max(100).default([]) }),
+  output: z.object({
+    items: z.array(
+      z.object({
+        agentId: z.string(),
+        status: z.string().default(""),
+        updatedAt: z.string().default(""),
+        turnOutcome: z.string().default(""),
+        turnEndedAt: z.string().default(""),
+        turnSummary: z.string().default(""),
+        turnError: z.string().default(""),
+      }),
+    ).default([]),
   }),
 });
 
