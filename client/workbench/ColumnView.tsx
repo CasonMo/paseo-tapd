@@ -3,7 +3,7 @@ import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { boardRpc } from "../../shared/contracts";
-import { Chip, formatTime, type WorkbenchTheme } from "./bits";
+import { Chip, HoverTip, formatTime, type WorkbenchTheme } from "./bits";
 import { statusTone, toneColor } from "./status-tones";
 
 type BoardData = RpcOutput<typeof boardRpc>;
@@ -126,9 +126,11 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.card}>
       <View style={styles.titleRow}>
-        <Text style={styles.title} numberOfLines={2}>
-          {entity.title}
-        </Text>
+        <HoverTip tip={entity.title} theme={theme} style={{ flex: 1 }} top={36}>
+          <Text style={styles.title} numberOfLines={2}>
+            {entity.title}
+          </Text>
+        </HoverTip>
         <Pressable accessibilityRole="button" hitSlop={8} onPress={onTogglePinned}>
           <Icon name="Star" size={15} color={pinned ? theme.colors.accent : theme.colors.foregroundMuted} />
         </Pressable>
@@ -138,7 +140,9 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
         {entity.priority ? <Chip label={entity.priority} theme={theme} /> : null}
         {entity.iterationName ? <Chip label={entity.iterationName} theme={theme} /> : null}
         {entity.kind !== "story" && entity.storyTitle ? (
-          <Chip label={`需求：${entity.storyTitle}`} theme={theme} tone="muted" />
+          <HoverTip tip={`所属需求：${entity.storyTitle}`} theme={theme} style={{ maxWidth: "100%" }} top={30} tipWidth={280}>
+            <Chip label={`需求：${entity.storyTitle}`} theme={theme} tone="muted" style={{ maxWidth: "100%" }} />
+          </HoverTip>
         ) : null}
       </View>
       <View style={styles.subRow}>

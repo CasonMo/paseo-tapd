@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type TextStyle, type ViewStyle } from "react-native";
 import { entityRpc, type EntityKind, type TapdLink } from "../../shared/contracts";
-import { Chip, formatTime, type WorkbenchTheme } from "./bits";
+import { Chip, HoverTip, formatTime, type WorkbenchTheme } from "./bits";
 import { statusTone, toneColor } from "./status-tones";
 
 export interface DetailTarget {
@@ -461,9 +461,11 @@ function ChildListSection({ label, items, totalHint, theme, extras }: {
           onPress={() => openChild(item)}
         >
           <Icon name={item.kind === "task" ? "ListTodo" : "Bug"} size={14} color={theme.colors.accent} />
-          <Text style={styles.title} numberOfLines={1}>
-            #{item.id} {item.title}
-          </Text>
+          <HoverTip tip={`#${item.id} ${item.title}`} theme={theme} style={{ flex: 1, flexShrink: 1, minWidth: 0 }} top={26}>
+            <Text style={styles.title} numberOfLines={1}>
+              #{item.id} {item.title}
+            </Text>
+          </HoverTip>
           <Text style={styles.meta}>{item.statusLabel}</Text>
           {item.owner ? <Text style={styles.meta}>{item.owner}</Text> : null}
           <Text style={styles.action}>详情</Text>

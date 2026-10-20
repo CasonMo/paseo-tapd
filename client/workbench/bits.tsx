@@ -1,9 +1,59 @@
 import type { PluginHostProps } from "@getpaseo/plugin/client";
 import { Icon } from "@getpaseo/plugin/client/react-native";
-import { useMemo } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 
 export type WorkbenchTheme = PluginHostProps["theme"];
+
+/**
+ * 省略文本（numberOfLines）的悬停全文提示：
+ * 桌面端鼠标悬停浮窗展示全文；无 onPress，点击事件继续冒泡给外层按钮。
+ */
+export function HoverTip({ tip, theme, children, style, top = 30, tipWidth }: {
+  /** 全文内容；为空时不显示提示 */
+  tip: string;
+  theme: WorkbenchTheme;
+  /** 被包裹的内容（已带 numberOfLines 截断的 Text/Chip 等） */
+  children: ReactNode;
+  /** 包裹层样式（如 flex:1 使内部 Text 撑满） */
+  style?: ViewStyle;
+  /** 浮窗相对包裹层顶部的偏移 */
+  top?: number;
+  /** 浮窗固定宽度；不传时撑满包裹层宽度 */
+  tipWidth?: number;
+}) {
+  const [hovering, setHovering] = useState(false);
+  const show = hovering && tip.trim().length > 0;
+  const styles = useMemo<{ box: ViewStyle; text: TextStyle }>(() => ({
+    box: {
+      position: "absolute",
+      top,
+      left: 0,
+      right: tipWidth == null ? 0 : undefined,
+      width: tipWidth,
+      zIndex: 20,
+      backgroundColor: theme.colors.surface2,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 10,
+    },
+    text: { color: theme.colors.foreground, fontSize: 12, lineHeight: 18 },
+  }), [theme, top, tipWidth]);  return (
+    <View style={style}>
+      <Pressable onHoverIn={() => setHovering(true)} onHoverOut={() => setHovering(false)}>
+        {children}
+      </Pressable>
+      {show ? (
+        <View style={styles.box}>
+          <Text style={styles.text} selectable>
+            {tip}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 export function formatTime(value: string): string {
   return value.length >= 16 ? value.slice(5, 16) : value;
@@ -23,7 +73,7 @@ function withAlpha(color: string, alphaPercent: number): string | null {
   return null;
 }
 
-export function Chip({ label, theme, tone = "plain", active = false, color, onPress }: {
+export function Chip({ label, theme, tone = "plain", active = false, color, onPress, style }: {
   label: string;
   theme: WorkbenchTheme;
   tone?: "plain" | "muted" | "accent";
@@ -31,6 +81,8 @@ export function Chip({ label, theme, tone = "plain", active = false, color, onPr
   /** 指定色相：浅色半透明底 + 同色文字。未指定时沿用 tone 的灰/强调样式。 */
   color?: string;
   onPress?: () => void;
+  /** 外层附加样式（如 maxWidth 限制超长标签省略） */
+  style?: ViewStyle;
 }) {
   const styles = useMemo<{ chip: ViewStyle; text: TextStyle }>(() => {
     if (color) {
@@ -69,12 +121,12 @@ export function Chip({ label, theme, tone = "plain", active = false, color, onPr
   );
   if (onPress) {
     return (
-      <Pressable accessibilityRole="button" onPress={onPress} style={styles.chip}>
+      <Pressable accessibilityRole="button" onPress={onPress} style={[styles.chip, style]}>
         {body}
       </Pressable>
     );
   }
-  return <View style={styles.chip}>{body}</View>;
+  return <View style={[styles.chip, style]}>{body}</View>;
 }
 
 export function ToolbarButton({ icon, label, onPress, theme, busy = false, active = false }: {
