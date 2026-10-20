@@ -71,14 +71,26 @@ function SettingsBody({ theme }: { theme: WorkbenchTheme }) {
 function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: WorkbenchTheme }) {
   const [token, setToken] = useState(settings.values.token);
   const [workspaceIds, setWorkspaceIds] = useState(settings.values.workspaceIds);
+  const [autoRefresh, setAutoRefresh] = useState(String(settings.values.autoRefreshSeconds || ""));
   const [checkState, setCheckState] = useState<{ ok: boolean; message: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const toast = useToast();
   const check = useRpc(checkRpc);
 
+  function parseAutoRefresh(): number {
+    const parsed = Number.parseInt(autoRefresh.trim(), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+    return Math.max(30, Math.min(3600, parsed));
+  }
+
   async function save() {
     const ok = await settings.save(
-      { ...settings.values, token: token.trim(), workspaceIds: workspaceIds.trim() },
+      {
+        ...settings.values,
+        token: token.trim(),
+        workspaceIds: workspaceIds.trim(),
+        autoRefreshSeconds: parseAutoRefresh(),
+      },
       settings.revision,
     );
     if (ok) toast.show("设置已保存", { variant: "success" });
@@ -124,6 +136,17 @@ function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: W
             placeholder="例如 12345678"
             initialValue={settings.values.workspaceIds}
             onChangeText={setWorkspaceIds}
+          />
+        </SettingsCard>
+      </SettingsSection>
+      <SettingsSection title="看板">
+        <SettingsCard>
+          <SettingsInput
+            label="自动刷新间隔（秒）"
+            hint="0 或留空=关闭；填写 ≥30 按该秒数定时自动强制刷新看板数据，上限 3600"
+            placeholder="0"
+            initialValue={String(settings.values.autoRefreshSeconds || "")}
+            onChangeText={setAutoRefresh}
           />
         </SettingsCard>
       </SettingsSection>

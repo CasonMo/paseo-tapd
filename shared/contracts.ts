@@ -110,6 +110,8 @@ export const tapdSettingsSchema = z.object({
   syncGitUrl: z.string().default(""),
   syncGitToken: z.string().default(""),
   syncBranch: z.string().default("main"),
+  /** 看板自动刷新间隔（秒）：0=关闭；>0 时客户端按该间隔定时强制刷新（下限 30 秒，上限 3600 秒） */
+  autoRefreshSeconds: z.number().int().min(0).max(3600).default(0),
 });
 export type TapdLink = TapdSettingsValues["links"][number];
 export type TapdSettingsValues = z.infer<typeof tapdSettingsSchema>;

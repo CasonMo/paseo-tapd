@@ -120,14 +120,20 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.status]);
 
-  // 手动刷新时绕过 daemon 看板缓存（force=true），后台刷新完成前由 stale 标记驱动 3 秒轮询
+  // 手动刷新时绕过 daemon 看板缓存（force=true），后台刷新完成前由 stale 标记驱动 3 秒轮询；
+  // 开启自动刷新后，所有看板请求都强制绕过缓存，实现用户自定义的定时刷新
+  const autoRefreshValue = settings.status === "ready" ? settings.values.autoRefreshSeconds : 0;
+  const autoRefreshSeconds = Math.max(0, Math.min(3600, autoRefreshValue));
   const boardForceRef = useRef(false);
   const board = useQuery({
     queryKey: ["tapd-board", filters ? JSON.stringify(filters) : "none"],
     queryFn: () =>
-      rpc({ filters: filters ?? undefined, force: boardForceRef.current || undefined }),
+      rpc({ filters: filters ?? undefined, force: boardForceRef.current || autoRefreshSeconds > 0 || undefined }),
     enabled: filters !== null,
-    refetchInterval: (query) => (query.state.data?.stale ? 3000 : false),
+    refetchInterval: (query) => {
+      if (query.state.data?.stale) return 3000;
+      return autoRefreshSeconds > 0 ? Math.max(30, autoRefreshSeconds) * 1000 : false;
+    },
     staleTime: 30_000,
     retry: 1,
   });

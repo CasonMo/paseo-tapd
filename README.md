@@ -15,6 +15,8 @@ A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo works
 - Attachment source: search TAPD items while composing a prompt and attach a snapshot
 - Agent binding: pick an agent from the item detail window to link it to the item; the prompt is prefilled with a default notice (editable) so sending notifies the agent — clear the field to bind silently; agent sessions still receive the TAPD environment variables (when not already defined) so a linked agent can query and update TAPD
 - Settings sync via Git: point the plugin at your own Git repository (URL + access token in settings) and push a backup, or pull to restore views, favorites, board columns, item↔agent links, and switches after uninstall/reinstall; the synced file is `tapd-workbench-settings.json`; privacy-sensitive fields never leave the machine: the TAPD token, project IDs, the Git token, and the local dispatch repo path
+- Configurable board auto-refresh: set an interval in seconds under Settings → 看板 (off by default, minimum 30s); when enabled the board force-refreshes on that cadence, and the usual 3-second wave still runs whenever a background refresh is in flight
+- Settings auto-backup: when Git sync is configured, every settings change is pushed to the repository automatically about 10 seconds after the last change (debounced, silent on failure); the Push/Pull buttons stay as-is
 - Update check: when the registry pins a newer version, the workbench shows a top banner with the update command (`paseo plugin update tapd-workbench`)
 
 ## Install
@@ -86,6 +88,8 @@ MIT
 - 附件源：撰写提示词时搜索 TAPD 单据并附上快照
 - Agent 绑定：在单据详情浮窗中选择一个 Agent 关联该单据；提示词默认填入标准跟进通知，可直接发送、修改后发送，或清空只绑定；Agent 会话会在未定义时注入 TAPD 环境变量，使其可直接查询与更新 TAPD
 - 配置同步（Git）：在设置里填自己的 Git 仓库地址与访问令牌，可把视图 / 收藏 / 看板列 / 单据关联记录 / 开关等设置一键推送备份，或从仓库拉取恢复（卸载重装后凭此找回关联）；同步文件为仓库根目录的 `tapd-workbench-settings.json`，隐私字段不出本机：TAPD Token、项目 ID、Git 令牌、派活仓库路径均不参与同步
+- 定时自动刷新：设置 → 看板里自定义轮询间隔（秒），默认关闭、最小 30 秒；开启后看板按该间隔定时强制刷新，后台刷新在途时仍按 3 秒一拍追赶
+- 设置自动备份：配置了 Git 同步后，每次修改设置约 10 秒（去抖）后自动推送备份，未配置或失败均静默；「推送 / 拉取」按钮保持不变
 - 更新检查：registry 固定到新版本时，工作台顶部显示带更新命令的横幅（`paseo plugin update tapd-workbench`）
 
 ## 安装
