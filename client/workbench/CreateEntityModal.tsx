@@ -1,9 +1,9 @@
-import { useRpc, openExternalUrl } from "@getpaseo/plugin/client";
+import { useRpc, useSettings, openExternalUrl } from "@getpaseo/plugin/client";
 import { FlatList, Icon, Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
-import { createFieldsRpc, createRpc, filterOptionsRpc, type EntityKind } from "../../shared/contracts";
+import { createFieldsRpc, createRpc, filterOptionsRpc, tapdSettings, type EntityKind } from "../../shared/contracts";
 import { Chip, type WorkbenchTheme } from "./bits";
 import { DatePicker } from "./DatePicker";
 
@@ -19,7 +19,7 @@ function looksLikeDateField(field: { key: string; label: string }): boolean {
 
 const KIND_TITLES: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
 
-type ModalMode = { name: "form" } | { name: "iteration" } | { name: "date"; fieldKey: string };
+type ModalMode = { name: "form" } | { name: "iteration" } | { name: "date"; fieldKey: string } | { name: "layout" };
 
 export interface CreatedEntity {
   id: string;
@@ -73,6 +73,60 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
     staleTime: 600_000,
     retry: 1,
   });
+  const settings = useSettings(tapdSettings);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  /** 动态字段按用户布局排序（order 优先，未登记字段按服务端原序），并按 kind 过滤隐藏项 */
+  const orderedFields = useMemo(() => {
+    const list = fieldsQuery.data?.fields ?? [];
+    const layout = settings.status === "ready" ? settings.values.createFieldLayout[kind] : undefined;
+    const indexOf = new Map((layout?.order ?? []).map((key, index) => [key, index]));
+    return [...list].sort((a, b) => {
+      const ai = indexOf.get(a.key);
+      const bi = indexOf.get(b.key);
+      if (ai !== undefined && bi !== undefined) return ai - bi;
+      if (ai !== undefined) return -1;
+      if (bi !== undefined) return 1;
+      return 0;
+    });
+  }, [fieldsQuery.data, kind, settings.status, settings]);
+
+  function persistLayout(nextOrder: string[], nextHidden: string[]) {
+    const current = settingsRef.current;
+    if (current.status !== "ready") {
+      toast.error("设置尚未就绪，无法保存字段布局");
+      return;
+    }
+    const job = async () => {
+      // 串行执行：取最新 settings 快照避免连续保存时 revision 冲突
+      const latest = settingsRef.current;
+      if (latest.status !== "ready") return;
+      const ok = await latest.save(
+        {
+          ...latest.values,
+          createFieldLayout: {
+            ...latest.values.createFieldLayout,
+            [kind]: { order: nextOrder, hidden: nextHidden },
+          },
+        },
+        latest.revision,
+      );
+      if (!ok) toast.error(latest.saveError ?? "字段布局保存失败");
+    };
+    saveQueueRef.current = saveQueueRef.current.then(job).catch(() => {});
+  }
+
+  const { visibleFields, hiddenFields } = useMemo(() => {
+    const hidden = new Set(
+      settings.status === "ready" ? settings.values.createFieldLayout[kind]?.hidden ?? [] : [],
+    );
+    return {
+      visibleFields: orderedFields.filter((field) => !hidden.has(field.key)),
+      hiddenFields: orderedFields.filter((field) => hidden.has(field.key)),
+    };
+  }, [orderedFields, settings.status, settings, kind]);
 
   useEffect(() => {
     if (!open) {
@@ -146,6 +200,9 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
     disabledButton: ViewStyle;
     optionRow: ViewStyle;
     optionText: TextStyle;
+    hiddenText: TextStyle;
+    layoutActions: ViewStyle;
+    layoutAction: ViewStyle;
   }>(() => ({
     row: { flexDirection: "row", alignItems: "center", gap: 8 },
     rowLabel: { color: theme.colors.foregroundMuted, fontSize: 13, width: 64 },
@@ -178,6 +235,15 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
       borderBottomColor: theme.colors.border,
     },
     optionText: { color: theme.colors.foreground, fontSize: 13, flex: 1 },
+    hiddenText: { color: theme.colors.foregroundMuted, opacity: 0.6 },
+    layoutActions: { flexDirection: "row", gap: 4, flexShrink: 0 },
+    layoutAction: {
+      padding: 6,
+      borderRadius: 6,
+      backgroundColor: theme.colors.surface2,
+      alignItems: "center",
+      justifyContent: "center",
+    },
   }), [theme]);
 
   if (mode.name === "date") {
@@ -204,6 +270,142 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
         </Modal>
       );
     }
+  }
+
+  if (mode.name === "layout") {
+    const layoutRowTypeModalTitle = `新建单据 · ${KIND_TITLES[kind]}字段布局`;
+    const rows: Array<
+      | { type: "header"; text: string }
+      | { type: "field"; key: string; label: string; hidden: boolean }
+      | { type: "hint"; text: string }
+    > = [
+      { type: "header", text: "显示中（↑↓ 调整顺序）" },
+      ...visibleFields.map((field) => ({
+        type: "field" as const,
+        key: field.key,
+        label: `${field.label}${field.required ? " * " : ""}`,
+        hidden: false,
+      })),
+      { type: "header", text: "已隐藏（点之恢复显示）" },
+      ...hiddenFields.map((field) => ({
+        type: "field" as const,
+        key: field.key,
+        label: `${field.label}${field.required ? " * " : ""}`,
+        hidden: true,
+      })),
+      { type: "hint", text: "布局按单据类型保存，随设置自动备份到 Git 仓库" },
+    ];
+    const hideField = (key: string) => {
+      persistLayout(
+        visibleFields.map((field) => field.key).filter((item) => item !== key),
+        hiddenFields.map((field) => field.key).concat([key]),
+      );
+    };
+    const restoreField = (key: string) => {
+      persistLayout(
+        visibleFields.map((field) => field.key).concat([key]),
+        hiddenFields.map((field) => field.key).filter((item) => item !== key),
+      );
+    };
+    const moveField = (key: string, delta: -1 | 1) => {
+      const order = visibleFields.map((field) => field.key);
+      const index = order.indexOf(key);
+      const target = index + delta;
+      if (index < 0 || target < 0 || target >= order.length) return;
+      order.splice(target, 0, order.splice(index, 1)[0]);
+      persistLayout(order, hiddenFields.map((field) => field.key));
+    };
+    return (
+      <Modal title={layoutRowTypeModalTitle} open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+        <Modal.Content scrollable={false} contentContainerStyle={{ padding: 0, gap: 0 }}>
+          <View style={{ flex: 1, minHeight: 0, paddingTop: 8, paddingHorizontal: 14 }}>
+            <Pressable accessibilityRole="button" style={styles.backRow} onPress={() => setMode({ name: "form" })}>
+              <Icon name="ChevronLeft" size={16} color={theme.colors.accent} />
+              <Text style={styles.link}>返回</Text>
+            </Pressable>
+            <FlatList
+              style={{ flex: 1, minHeight: 0 }}
+              data={rows}
+              keyExtractor={(item, index) =>
+                item.type === "field" ? item.key : item.type === "header" ? `header-${item.text}` : `hint-${index}`
+              }
+              renderItem={({ item }) => {
+                if (item.type === "header") {
+                  return (
+                    <Text style={{
+                      color: theme.colors.foregroundMuted,
+                      fontSize: 12,
+                      paddingTop: 10,
+                      paddingBottom: 2,
+                    }}>
+                      {item.text}
+                    </Text>
+                  );
+                }
+                if (item.type === "hint") {
+                  return (
+                    <Text style={{ color: theme.colors.foregroundMuted, fontSize: 11, paddingVertical: 10 }}>
+                      {item.text}
+                    </Text>
+                  );
+                }
+                return (
+                  <View style={styles.optionRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      style={{ flex: 1 }}
+                      disabled={item.hidden}
+                      onPress={() => restoreField(item.key)}
+                    >
+                      <Text style={[styles.optionText, item.hidden ? styles.hiddenText : null]} numberOfLines={1}>
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                    {item.hidden ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`恢复显示 ${item.label}`}
+                        style={styles.layoutAction}
+                        onPress={() => restoreField(item.key)}
+                      >
+                        <Icon name="Eye" size={14} color={theme.colors.accent} />
+                      </Pressable>
+                    ) : (
+                      <View style={styles.layoutActions}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`上移 ${item.label}`}
+                          style={styles.layoutAction}
+                          onPress={() => moveField(item.key, -1)}
+                        >
+                          <Icon name="ChevronUp" size={14} color={theme.colors.foregroundMuted} />
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`下移 ${item.label}`}
+                          style={styles.layoutAction}
+                          onPress={() => moveField(item.key, 1)}
+                        >
+                          <Icon name="ChevronDown" size={14} color={theme.colors.foregroundMuted} />
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`隐藏 ${item.label}`}
+                          style={styles.layoutAction}
+                          onPress={() => hideField(item.key)}
+                        >
+                          <Icon name="EyeOff" size={14} color={theme.colors.accent} />
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                );
+              }}
+            />
+          </View>
+        </Modal.Content>
+      </Modal>
+    );
   }
 
   if (mode.name === "iteration") {
@@ -274,6 +476,23 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
               ))}
             </View>
           </View>
+          {initial ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="管理字段顺序与隐藏"
+              style={styles.optionRow}
+              onPress={() => setMode({ name: "layout" })}
+            >
+              <Icon name="SlidersHorizontal" size={14} color={theme.colors.foregroundMuted} />
+              <Text style={[styles.optionText, { flex: undefined, width: 64, color: theme.colors.foregroundMuted, fontSize: 13 }]}>
+                字段布局
+              </Text>
+              <Text style={styles.optionText} numberOfLines={1}>
+                调整顺序、隐藏 / 恢复字段
+              </Text>
+              <Icon name="ChevronRight" size={15} color={theme.colors.foregroundMuted} />
+            </Pressable>
+          ) : null}
           <View style={styles.row}>
             <Text style={styles.rowLabel}>标题</Text>
             <TextInput
@@ -330,7 +549,7 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
             <Icon name="ChevronRight" size={15} color={theme.colors.foregroundMuted} />
           </Pressable>
           {initial
-            ? (fieldsQuery.data?.fields ?? []).map((field) => {
+            ? visibleFields.map((field) => {
                 const value = extraValues[field.key] ?? "";
                 const setValue = (text: string) => setExtraValues((prev) => ({ ...prev, [field.key]: text }));
                 const label = `${field.label}${field.required ? " *" : ""}`;

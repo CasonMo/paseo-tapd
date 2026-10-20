@@ -112,6 +112,16 @@ export const tapdSettingsSchema = z.object({
   syncBranch: z.string().default("main"),
   /** 看板自动刷新间隔（秒）：0=关闭；>0 时客户端按该间隔定时强制刷新（下限 30 秒，上限 3600 秒） */
   autoRefreshSeconds: z.number().int().min(0).max(3600).default(0),
+  /** 挂载创建（需求详情建任务/缺陷）动态字段的布局：kind → { order: 显示顺序, hidden: 隐藏清单 }；order 未覆盖的字段按服务端原序追加 */
+  createFieldLayout: z
+    .record(
+      z.string(),
+      z.object({
+        order: z.array(z.string()).default([]),
+        hidden: z.array(z.string()).default([]),
+      }),
+    )
+    .default({}),
 });
 export type TapdLink = TapdSettingsValues["links"][number];
 export type TapdSettingsValues = z.infer<typeof tapdSettingsSchema>;

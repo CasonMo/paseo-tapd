@@ -335,7 +335,7 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
               style={styles.action}
               onPress={() => extras.onCreateChild?.(data, "task")}
             >
-              <Icon name="Plus" size={14} color={theme.colors.foreground} />
+              <Icon name="ClipboardList" size={14} color={theme.colors.foreground} />
               <Text style={styles.actionLabel}>+ 任务</Text>
             </Pressable>
             <Pressable
