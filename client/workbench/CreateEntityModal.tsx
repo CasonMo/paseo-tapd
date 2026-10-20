@@ -3,7 +3,7 @@ import { FlatList, Icon, Modal, TextInput, useToast } from "@getpaseo/plugin/cli
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
-import { createRpc, filterOptionsRpc, type EntityKind } from "../../shared/contracts";
+import { createFieldsRpc, createRpc, filterOptionsRpc, type EntityKind } from "../../shared/contracts";
 import { Chip, type WorkbenchTheme } from "./bits";
 
 const KIND_TITLES: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
@@ -32,6 +32,7 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
   initial?: CreateChildPreset | null;
 }) {
   const create = useRpc(createRpc);
+  const fetchCreateFields = useRpc(createFieldsRpc);
   const fetchOptions = useRpc(filterOptionsRpc);
   const optionsQuery = useQuery({
     queryKey: ["tapd-filter-options"],
@@ -46,10 +47,19 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [owner, setOwner] = useState("");
+  const [ownerTouched, setOwnerTouched] = useState(false);
   const [priority, setPriority] = useState("");
   const [iterationId, setIterationId] = useState("");
+  const [extraValues, setExtraValues] = useState<Record<string, string>>({});
   const [mode, setMode] = useState<"form" | "iteration">("form");
   const [submitting, setSubmitting] = useState(false);
+  const fieldsQuery = useQuery({
+    queryKey: ["tapd-create-fields", kind, initial?.workspaceId ?? ""],
+    queryFn: () => fetchCreateFields({ kind, workspaceId: initial?.workspaceId ?? "" }),
+    enabled: open && initial !== null,
+    staleTime: 600_000,
+    retry: 1,
+  });
 
   useEffect(() => {
     if (!open) {
@@ -57,14 +67,22 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
       setTitle("");
       setDescription("");
       setOwner("");
+      setOwnerTouched(false);
       setPriority("");
       setIterationId("");
+      setExtraValues({});
       setMode("form");
       setSubmitting(false);
     } else if (initial) {
       setKind(initial.kind);
     }
   }, [open, initial]);
+
+  // 挂载创建：fields_info 就绪且用户未手改过处理人时，默认填当前登录用户
+  const me = fieldsQuery.data?.me ?? "";
+  useEffect(() => {
+    if (!ownerTouched && me && owner === "") setOwner(me);
+  }, [ownerTouched, me, owner]);
 
   const priorityOptions = useMemo(
     () => (optionsQuery.data?.priorities ?? []).filter((option) => option.kinds.includes(kind)),
@@ -89,6 +107,7 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
         iterationId,
         storyId: initial ? initial.storyId : undefined,
         workspaceId: initial ? initial.workspaceId : undefined,
+        extraFields: initial ? extraValues : undefined,
       });
       toast.show(`已创建「${trimmed}」#${created.id}`, { variant: "success" });
       onCreated({ id: created.id, kind: created.kind, url: created.url, title: trimmed });
@@ -210,6 +229,7 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
                   onPress={() => {
                     setKind(item);
                     setPriority("");
+                    setExtraValues({});
                   }}
                 />
               ))}
@@ -240,10 +260,13 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
             <Text style={styles.rowLabel}>处理人</Text>
             <TextInput
               style={styles.input}
-              placeholder="昵称，留空则不指定"
+              placeholder="昵称，默认当前登录用户"
               placeholderTextColor={theme.colors.foregroundMuted}
               value={owner}
-              onChangeText={setOwner}
+              onChangeText={(text) => {
+                setOwnerTouched(true);
+                setOwner(text);
+              }}
             />
           </View>
           {priorityOptions.length > 0 ? (
@@ -267,6 +290,85 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
             <Text style={styles.optionText} numberOfLines={1}>{iterationLabel}</Text>
             <Icon name="ChevronRight" size={15} color={theme.colors.foregroundMuted} />
           </Pressable>
+          {initial
+            ? (fieldsQuery.data?.fields ?? []).map((field) => {
+                const value = extraValues[field.key] ?? "";
+                const setValue = (text: string) => setExtraValues((prev) => ({ ...prev, [field.key]: text }));
+                const label = `${field.label}${field.required ? " *" : ""}`;
+                if (field.inputKind === "enum" || field.inputKind === "user") {
+                  return (
+                    <View key={field.key} style={styles.row}>
+                      <Text style={styles.rowLabel} numberOfLines={1}>{label}</Text>
+                      <View style={styles.chips}>
+                        {field.options.length > 0 && field.options.length <= 8
+                          ? field.options.map((option) => {
+                              const active = field.single ? value === option.value : value.split(";").includes(option.value);
+                              return (
+                                <Chip
+                                  key={option.value}
+                                  label={option.label}
+                                  theme={theme}
+                                  active={active}
+                                  onPress={() => {
+                                    if (field.single) {
+                                      setValue(active ? "" : option.value);
+                                    } else {
+                                      const list = value.split(";").filter(Boolean);
+                                      const next = active
+                                        ? list.filter((item) => item !== option.value)
+                                        : [...list, option.value];
+                                      setValue(next.join(";"));
+                                    }
+                                  }}
+                                />
+                              );
+                            })
+                          : (
+                              <TextInput
+                                style={styles.input}
+                                placeholder={
+                                  field.inputKind === "user"
+                                    ? "昵称，多个用英文分号分隔"
+                                    : "可选，多个用英文分号分隔"
+                                }
+                                placeholderTextColor={theme.colors.foregroundMuted}
+                                value={value}
+                                onChangeText={setValue}
+                              />
+                            )}
+                      </View>
+                    </View>
+                  );
+                }
+                if (field.inputKind === "textarea") {
+                  return (
+                    <View key={field.key} style={[styles.row, { alignItems: "flex-start" }]}>
+                      <Text style={[styles.rowLabel, { paddingTop: 8 }]}>{label}</Text>
+                      <TextInput
+                        style={[styles.input, styles.inputMultiline]}
+                        placeholder="可选"
+                        placeholderTextColor={theme.colors.foregroundMuted}
+                        multiline
+                        value={value}
+                        onChangeText={setValue}
+                      />
+                    </View>
+                  );
+                }
+                return (
+                  <View key={field.key} style={styles.row}>
+                    <Text style={styles.rowLabel} numberOfLines={1}>{label}</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={field.inputKind === "date" ? "如 YYYY-MM-DD" : "可选"}
+                      placeholderTextColor={theme.colors.foregroundMuted}
+                      value={value}
+                      onChangeText={setValue}
+                    />
+                  </View>
+                );
+              })
+            : null}
           <View style={styles.footer}>
             <Pressable
               accessibilityRole="button"
