@@ -98,7 +98,6 @@ export function BindAgentModal({ open, onClose, theme, data, links, onBound }: {
         workspaceId: agent.workspaceId,
         agentId: agent.id,
         agentTitle: agent.title,
-        promptSnippet: notice.slice(0, 200),
       });
       onBound(link);
       const notified = await notifyAgent(

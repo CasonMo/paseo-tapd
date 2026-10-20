@@ -1,80 +1,9 @@
 import type { PluginHostProps } from "@getpaseo/plugin/client";
 import { Icon } from "@getpaseo/plugin/client/react-native";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo } from "react";
 import { Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 
 export type WorkbenchTheme = PluginHostProps["theme"];
-
-/** 依据前景色亮度判断当前主题是否为暗色（浮窗底色跟随明暗切换） */
-function themeIsDark(theme: WorkbenchTheme): boolean {
-  const raw = theme.colors.foreground.trim();
-  const hex6 = /^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/.exec(raw);
-  const hex3 = /^#([0-9a-fA-F]{3})$/.exec(raw);
-  const [r, g, b] = hex6
-    ? hex6[1].match(/../g)?.map((h) => parseInt(h, 16)) ?? [0, 0, 0]
-    : hex3
-      ? hex3[1].split("").map((c) => parseInt(c + c, 16))
-      : [0, 0, 0];
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
-}
-
-/**
- * 省略文本（numberOfLines）的悬停全文提示：
- * 桌面端鼠标悬停浮窗展示全文；无 onPress，点击事件继续冒泡给外层按钮。
- */
-export function HoverTip({ tip, theme, children, style, top = 30, tipWidth }: {
-  /** 全文内容；为空时不显示提示 */
-  tip: string;
-  theme: WorkbenchTheme;
-  /** 被包裹的内容（已带 numberOfLines 截断的 Text/Chip 等） */
-  children: ReactNode;
-  /** 包裹层样式（如 flex:1 使内部 Text 撑满） */
-  style?: ViewStyle;
-  /** 浮窗相对包裹层顶部的偏移 */
-  top?: number;
-  /** 浮窗固定宽度；不传时撑满包裹层宽度 */
-  tipWidth?: number;
-}) {
-  const [hovering, setHovering] = useState(false);
-  const show = hovering && tip.trim().length > 0;
-  const dark = themeIsDark(theme);
-  const styles = useMemo<{ box: ViewStyle; text: TextStyle }>(() => ({
-    box: {
-      position: "absolute",
-      top,
-      left: tipWidth == null ? 0 : undefined,
-      right: tipWidth == null ? 0 : undefined,
-      width: tipWidth,
-      zIndex: 50,
-      backgroundColor: dark ? "#26282f" : "#f7f7f9",
-      borderColor: theme.colors.border,
-      borderWidth: 1,
-      borderRadius: 8,
-      padding: 10,
-      // 桌面端阴影（react-native-web），提升与卡片底色的区分度
-      shadowColor: "#000",
-      shadowOpacity: 0.35,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 8,
-    },
-    text: { color: theme.colors.foreground, fontSize: 12, lineHeight: 18 },
-  }), [theme, top, tipWidth, dark]);
-  return (
-    <View style={[{ zIndex: 40 }, style]}>
-      <Pressable onHoverIn={() => setHovering(true)} onHoverOut={() => setHovering(false)}>
-        {children}
-      </Pressable>
-      {show ? (
-        <View style={styles.box}>
-          <Text style={styles.text} selectable>
-            {tip}
-          </Text>
-        </View>
-      ) : null}
-    </View>
-  );
-}
 
 export function formatTime(value: string): string {
   return value.length >= 16 ? value.slice(5, 16) : value;

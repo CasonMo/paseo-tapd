@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type TextStyle, type ViewStyle } from "react-native";
 import { agentStatusRpc, entityRpc, type EntityKind, type TapdLink } from "../../shared/contracts";
-import { Chip, HoverTip, agentStatusColor, formatTime, formatIsoTime, type WorkbenchTheme } from "./bits";
+import { Chip, agentStatusColor, formatTime, formatIsoTime, type WorkbenchTheme } from "./bits";
 import { statusTone, toneColor } from "./status-tones";
 
 export interface DetailTarget {
@@ -465,6 +465,7 @@ function ChildListSection({ label, items, totalHint, theme, extras }: {
     title: TextStyle;
     meta: TextStyle;
     action: TextStyle;
+    fullTitle: TextStyle;
     pager: ViewStyle;
     pageText: TextStyle;
     pageBtn: TextStyle;
@@ -485,6 +486,7 @@ function ChildListSection({ label, items, totalHint, theme, extras }: {
     title: { color: theme.colors.foreground, fontSize: 12, flex: 1, flexShrink: 1 },
     meta: { color: theme.colors.foregroundMuted, fontSize: 11 },
     action: { color: theme.colors.accent, fontSize: 12 },
+    fullTitle: { color: theme.colors.foregroundMuted, fontSize: 11, lineHeight: 16 },
     pager: { flexDirection: "row", alignItems: "center", gap: 10, justifyContent: "flex-end" },
     pageText: { color: theme.colors.foregroundMuted, fontSize: 11 },
     pageBtn: { color: theme.colors.accent, fontSize: 14 },
@@ -503,23 +505,7 @@ function ChildListSection({ label, items, totalHint, theme, extras }: {
     <View style={{ gap: 6 }}>
       <Text style={styles.section}>{label}（{totalHint ?? items.length}）</Text>
       {visible.map((item) => (
-        <Pressable
-          key={item.id}
-          accessibilityRole="button"
-          accessibilityLabel={`打开${item.kind === "task" ? "任务" : "缺陷"} #${item.id}`}
-          style={styles.row}
-          onPress={() => openChild(item)}
-        >
-          <Icon name={item.kind === "task" ? "ListTodo" : "Bug"} size={14} color={theme.colors.accent} />
-          <HoverTip tip={`#${item.id} ${item.title}`} theme={theme} style={{ flex: 1, flexShrink: 1, minWidth: 0 }} top={26}>
-            <Text style={styles.title} numberOfLines={1}>
-              #{item.id} {item.title}
-            </Text>
-          </HoverTip>
-          <Text style={styles.meta}>{item.statusLabel}</Text>
-          {item.owner ? <Text style={styles.meta}>{item.owner}</Text> : null}
-          <Text style={styles.action}>详情</Text>
-        </Pressable>
+        <ChildRow key={item.id} item={item} theme={theme} styles={styles} onOpen={() => openChild(item)} />
       ))}
       {pageCount > 1 ? (
         <View style={styles.pager}>
@@ -548,27 +534,60 @@ function ChildListSection({ label, items, totalHint, theme, extras }: {
   );
 }
 
-/** 关联 Agent 行：悬停/点击展示保存的提示词前 200 字；展示 agent 实时状态与最近一次 turn 结果 */
+function ChildRow({ item, theme, styles, onOpen }: {
+  item: EntityChildItem;
+  theme: WorkbenchTheme;
+  styles: { row: ViewStyle; title: TextStyle; meta: TextStyle; action: TextStyle; fullTitle: TextStyle };
+  onOpen: () => void;
+}) {
+  // hover 时在行内展开全文（浮窗方案在此环境会被相邻行遮挡，不采用）
+  const [open, setOpen] = useState(false);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`打开${item.kind === "task" ? "任务" : "缺陷"} #${item.id}`}
+      style={styles.row}
+      onHoverIn={() => setOpen(true)}
+      onHoverOut={() => setOpen(false)}
+      onPress={onOpen}
+    >
+      <Icon name={item.kind === "task" ? "ListTodo" : "Bug"} size={14} color={theme.colors.accent} />
+      <View style={{ flex: 1, flexShrink: 1, minWidth: 0, gap: 2 }}>
+        <Text style={styles.title} numberOfLines={1}>
+          #{item.id} {item.title}
+        </Text>
+        {open ? (
+          <Text selectable style={styles.fullTitle}>
+            #{item.id} {item.title}
+          </Text>
+        ) : null}
+      </View>
+      <Text style={styles.meta}>{item.statusLabel}</Text>
+      {item.owner ? <Text style={styles.meta}>{item.owner}</Text> : null}
+      <Text style={styles.action}>详情</Text>
+    </Pressable>
+  );
+}
+
+/** 关联 Agent 行：展示 agent 实时状态与最近一次 turn 结果 */
 function AgentLinkRow({ link, theme, extras, status }: {
   link: TapdLink;
   theme: WorkbenchTheme;
   extras: DetailExtras;
   status?: AgentStatusItem;
 }) {
-  const [hovering, setHovering] = useState(false);
-  const [pinned, setPinned] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
   const title = useMemo(() => {
     const base = link.agentTitle || link.workspaceTitle || "";
     return base.length > 40 ? `${base.slice(0, 40)}…` : base;
   }, [link.agentTitle, link.workspaceTitle]);
   const shortId = (link.agentId || link.workspaceId).slice(0, 8);
-  const showTip = hovering || pinned;
 
   const styles = useMemo<{
     row: ViewStyle;
-    tipBox: ViewStyle;
+    resultBox: ViewStyle;
     tipText: TextStyle;
+    statusText: TextStyle;
     titleText: TextStyle;
     idText: TextStyle;
     actionText: TextStyle;
@@ -585,26 +604,21 @@ function AgentLinkRow({ link, theme, extras, status }: {
       paddingHorizontal: 10,
       paddingVertical: 8,
     },
-    tipBox: {
-      position: "absolute",
-      top: 38,
-      left: 26,
-      right: 26,
-      zIndex: 20,
+    resultBox: {
       backgroundColor: theme.colors.surface2,
       borderColor: theme.colors.border,
       borderWidth: 1,
       borderRadius: 8,
       padding: 10,
+      marginTop: 4,
     },
     tipText: { color: theme.colors.foreground, fontSize: 12, lineHeight: 18 },
+    statusText: { color: theme.colors.foregroundMuted, fontSize: 11 },
     titleText: { color: theme.colors.foreground, fontSize: 12, flexShrink: 1 },
     idText: { color: theme.colors.foregroundMuted, fontSize: 11 },
     actionText: { color: theme.colors.accent, fontSize: 12 },
     dangerText: { color: theme.colors.statusDanger, fontSize: 12 },
   }), [theme]);
-
-  const snippet = link.promptSnippet.trim();
 
   const liveStatus = status?.status ?? "";
   const statusColor = agentStatusColor(liveStatus, theme);
@@ -640,15 +654,7 @@ function AgentLinkRow({ link, theme, extras, status }: {
 
   return (
     <View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`关联 Agent ${title || shortId}，悬停查看提示词`}
-        style={styles.row}
-        // 桌面端（react-native-web）悬停预览；移动端无 hover，由点击固定兜底
-        onHoverIn={() => setHovering(true)}
-        onHoverOut={() => setHovering(false)}
-        onPress={() => setPinned((value) => !value)}
-      >
+      <View style={styles.row}>
         <Icon name="Bot" size={14} color={theme.colors.accent} />
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text style={styles.titleText} numberOfLines={1}>
@@ -656,6 +662,15 @@ function AgentLinkRow({ link, theme, extras, status }: {
           </Text>
           <Text style={styles.idText}>{shortId}</Text>
         </View>
+        {link.agentId && liveStatus ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: statusColor }} />
+            <Text style={styles.statusText}>
+              {statusLabel}
+              {status?.updatedAt ? ` · ${formatIsoTime(status.updatedAt)}` : ""}
+            </Text>
+          </View>
+        ) : null}
         {extras.navigation?.openWorkspace ? (
           <Pressable accessibilityRole="button" onPress={() => extras.navigation?.openWorkspace?.({ workspaceId: link.workspaceId })}>
             <Text style={styles.actionText}>打开工作区</Text>
@@ -671,32 +686,9 @@ function AgentLinkRow({ link, theme, extras, status }: {
             <Text style={styles.dangerText}>解除</Text>
           </Pressable>
         ) : null}
-      </Pressable>
-      {showTip ? (
-        <View style={styles.tipBox}>
-          <Text style={styles.tipText} selectable>
-            {snippet || "（该绑定创建于旧版本，未记录提示词）"}
-          </Text>
-        </View>
-      ) : null}
-      {link.agentId && (liveStatus || hasTurn) ? (
-        <View style={{ paddingLeft: 10, paddingTop: resultOpen ? 0 : 4 }}>
-          {liveStatus ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <View
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: 4,
-                  backgroundColor: statusColor,
-                }}
-              />
-              <Text style={{ color: theme.colors.foregroundMuted, fontSize: 11 }}>
-                {statusLabel}
-                {status?.updatedAt ? ` · ${formatIsoTime(status.updatedAt)}` : ""}
-              </Text>
-            </View>
-          ) : null}
+      </View>
+      {link.agentId && hasTurn ? (
+        <View style={{ paddingLeft: 10 }}>
           {hasTurn && turnLabel ? (
             <Pressable
               accessibilityRole="button"
@@ -713,7 +705,7 @@ function AgentLinkRow({ link, theme, extras, status }: {
             </Pressable>
           ) : null}
           {hasTurn && resultOpen && turnText ? (
-            <View style={{ ...styles.tipBox, position: "relative", top: undefined, left: undefined, right: undefined, marginTop: 4 }}>
+            <View style={styles.resultBox}>
               <Text style={styles.tipText} selectable>
                 {turnText}
               </Text>

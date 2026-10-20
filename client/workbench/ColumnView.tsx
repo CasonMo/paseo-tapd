@@ -102,6 +102,7 @@ function EntityCard({ entity, theme, pinned, linked, status, onTogglePinned, onP
   onTogglePinned: () => void;
   onPress: () => void;
 }) {
+  const statusDot = status?.status ? agentStatusColor(status.status, theme) : undefined;
   const styles = useMemo<{ card: ViewStyle; titleRow: ViewStyle; title: TextStyle; idText: TextStyle; meta: ViewStyle; subRow: ViewStyle; sub: TextStyle; storyChip: TextStyle }>(() => ({
     card: {
       backgroundColor: theme.colors.surface1,
