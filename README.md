@@ -14,6 +14,7 @@ A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo works
 - Write back to TAPD: comments (plain text converted to HTML), workflow status changes, and new item creation
 - Attachment source: search TAPD items while composing a prompt and attach a snapshot
 - Agent binding: pick an agent from the item detail window to link it to the item; the bound agent receives a short follow-up notice with the item snapshot, and agent sessions receive the TAPD environment variables (when not already defined) so a linked agent can query and update TAPD
+- Settings sync via Git: point the plugin at your own Git repository (URL + access token in settings) and push a backup, or pull to restore views, favorites, board columns, item↔agent links, and switches after uninstall/reinstall; the synced file is `tapd-workbench-settings.json`; privacy-sensitive fields never leave the machine: the TAPD token, project IDs, the Git token, and the local dispatch repo path
 - Update check: when the registry pins a newer version, the workbench shows a top banner with the update command (`paseo plugin update tapd-workbench`)
 
 ## Install
@@ -47,6 +48,7 @@ Pick an agent from the item detail window to link the item to that conversation.
 - Reads cover every configured project. Write operations (comments, status changes, item creation) target the item's actual project when known, falling back to the first configured TAPD project.
 - Agent dispatch sends the item snapshot (used as the prompt) to the selected agent provider through the Paseo SDK.
 - Update checks fetch the public registry record and this repository's manifest at the pinned commit from GitHub (`raw.githubusercontent.com`, falling back to `api.github.com`). No credentials are attached and no user data is sent; the result is cached for an hour.
+- Settings sync contacts exactly one extra destination: the Git remote the user configured in settings (HTTPS URL + access token, or an SSH URL). Push/pull only happen on the explicit buttons in settings; the synced payload is the sanitized settings JSON (`tapd-workbench-settings.json`, no TAPD token, no Git token) written by the daemon to a temporary clone that is deleted after each operation. Errors never echo the token; the Git credentials are not stored anywhere beyond the plugin's own settings.
 
 ## Development
 
@@ -83,6 +85,7 @@ MIT
 - 回写 TAPD：评论（纯文本自动转 HTML）、工作流状态变更、新建单据
 - 附件源：撰写提示词时搜索 TAPD 单据并附上快照
 - Agent 绑定：在单据详情浮窗中选择一个 Agent 关联该单据；绑定后该 Agent 会收到一条带单据快照的简短跟进提示，Agent 会话会在未定义时注入 TAPD 环境变量，使其可直接查询与更新 TAPD
+- 配置同步（Git）：在设置里填自己的 Git 仓库地址与访问令牌，可把视图 / 收藏 / 看板列 / 单据关联记录 / 开关等设置一键推送备份，或从仓库拉取恢复（卸载重装后凭此找回关联）；同步文件为仓库根目录的 `tapd-workbench-settings.json`，隐私字段不出本机：TAPD Token、项目 ID、Git 令牌、派活仓库路径均不参与同步
 - 更新检查：registry 固定到新版本时，工作台顶部显示带更新命令的横幅（`paseo plugin update tapd-workbench`）
 
 ## 安装
@@ -120,6 +123,7 @@ paseo plugin add git:<repo-url>
 - 派给 Agent 时，单据快照（作为提示词）经 Paseo SDK 发送给所选的 agent provider。
 - Agent 状态与结果摘要通过插件自身的 daemon RPC 读取，不新增外部网络目的地；自动回评使用与手动评论相同的 TAPD OpenAPI 评论通道。
 - 更新检查从 GitHub 拉取公开的 registry 记录与固定提交处的本仓库清单（`raw.githubusercontent.com`，失败时回退 `api.github.com`），不附带凭据、不发送用户数据，结果缓存一小时。
+- 配置同步只新增一个网络目的地：用户在设置里填写的 Git 仓库（HTTPS 地址 + 访问令牌，或 SSH 地址）。推送/拉取只由设置页的按钮触发；上传/下载内容为脱敏后的设置 JSON（`tapd-workbench-settings.json`，不含 TAPD Token 与 Git 令牌），daemon 侧在临时目录克隆、用完即删；报错信息不回显令牌，Git 凭据不会落到克隆目录。
 
 ## 开发
 

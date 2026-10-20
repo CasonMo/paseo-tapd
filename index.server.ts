@@ -1,8 +1,9 @@
 import type { PluginServerContext } from "@getpaseo/plugin/server";
-import { addCommentRpc, agentStatusRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, tapdSettings, updateCheckRpc, updateStatusRpc } from "./shared/contracts";
+import { addCommentRpc, agentStatusRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, syncPullRpc, syncPushRpc, tapdSettings, updateCheckRpc, updateStatusRpc } from "./shared/contracts";
 import { createHandlers } from "./server/handlers";
 import { recordTurnEnd } from "./server/agent-state";
 import { clearTapdCache } from "./server/tapd";
+import { pullSettings, pushSettings, type SyncSettingsAccess } from "./server/git-sync";
 
 export default function contribute(server: PluginServerContext) {
   const settings = server.registerSettings(tapdSettings);
@@ -12,6 +13,9 @@ export default function contribute(server: PluginServerContext) {
     if (state.status === "ready") return state.values;
     throw new Error("TAPD 工作台配置数据无效，请到插件设置中重置。");
   };
+
+  // Git 配置同步：推送读当前设置；拉取返回非密字段，由客户端写回设置
+  const syncAccess: SyncSettingsAccess = { read: getValues };
 
   const handlers = createHandlers(getValues);
   server.handle(boardRpc, handlers.board);
@@ -25,6 +29,8 @@ export default function contribute(server: PluginServerContext) {
   server.handle(checkRpc, handlers.check);
   server.handle(updateCheckRpc, handlers.updateCheck);
   server.handle(agentStatusRpc, handlers.agentStatus);
+  server.handle(syncPushRpc, async () => ({ message: await pushSettings(syncAccess) }));
+  server.handle(syncPullRpc, async () => await pullSettings(syncAccess));
 
   const unsubscribe = settings.subscribe(() => {
     clearTapdCache();

@@ -106,6 +106,10 @@ export const tapdSettingsSchema = z.object({
   lastProvider: z.string().default(""),
   /** Agent 完成工作后自动回写 TAPD 评论（默认关，避免到处刷评论） */
   autoReportAgentResult: z.boolean().default(false),
+  /** Git 配置同步：把非密配置（视图/收藏/看板列/关联记录等）备份到用户自己的仓库，卸载重装后可一键恢复 */
+  syncGitUrl: z.string().default(""),
+  syncGitToken: z.string().default(""),
+  syncBranch: z.string().default("main"),
 });
 export type TapdLink = TapdSettingsValues["links"][number];
 export type TapdSettingsValues = z.infer<typeof tapdSettingsSchema>;
@@ -461,6 +465,23 @@ export const agentStatusRpc = defineRpc({
         turnError: z.string().default(""),
       }),
     ).default([]),
+  }),
+});
+
+/** 配置同步：把非密配置推送到用户 Git 仓库 / 从仓库拉取覆盖（均在设置页手动触发） */
+export const syncPushRpc = defineRpc({
+  name: "tapd.sync_push",
+  input: z.object({}),
+  output: z.object({ message: z.string() }),
+});
+
+export const syncPullRpc = defineRpc({
+  name: "tapd.sync_pull",
+  input: z.object({}),
+  output: z.object({
+    message: z.string(),
+    /** 待合并的非密设置字段（客户端负责用 settings.save 写回） */
+    values: z.record(z.string(), z.unknown()),
   }),
 });
 

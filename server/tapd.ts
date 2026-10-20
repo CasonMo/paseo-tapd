@@ -157,10 +157,13 @@ export function resolveConfig(settings: TapdConfigInput): TapdConfig {
   const token = settingsToken || envToken;
   const tokenSource: TapdConfig["tokenSource"] = settingsToken ? "settings" : envToken ? "env" : "none";
   const rawWorkspaces = settings.workspaceIds.trim() || process.env.TAPD_WORKSPACE_IDS || "";
-  const workspaceIds = rawWorkspaces
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
+  // 去重：重复的项目 ID 会让按项目遍历的查询产出重复卡片
+  const workspaceIds = [...new Set(
+    rawWorkspaces
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0),
+  )];
   return { endpoint, site, token, tokenSource, workspaceIds };
 }
 
@@ -1028,21 +1031,21 @@ export async function fetchColumn(
       );
       const seen = new Set<string>();
       const merged: EntitySummary[] = [];
-      const allRefs: EntityRowRef[] = [];
+      const mergedRefs: EntityRowRef[] = [];
       for (const batch of batches) {
         for (const ref of batch) {
-          allRefs.push(ref);
           const key = `${ref.workspaceId}-${String(ref.row?.id ?? "")}`;
           if (seen.has(key)) continue;
           seen.add(key);
           merged.push(toSummary(config, ref.workspaceId, kind, ref.row, labels, iterationMap));
+          mergedRefs.push(ref);
         }
         if (batch.length >= 200) truncated = true;
       }
       if (kind !== "story" && merged.length > 0) {
-        const storyTitles = await resolveStoryTitles(config, allRefs);
+        const storyTitles = await resolveStoryTitles(config, mergedRefs);
         for (let index = 0; index < merged.length; index += 1) {
-          merged[index] = toSummary(config, allRefs[index].workspaceId, kind, allRefs[index].row, labels, iterationMap, storyTitles);
+          merged[index] = toSummary(config, mergedRefs[index].workspaceId, kind, mergedRefs[index].row, labels, iterationMap, storyTitles);
         }
       }
       merged.sort((a, b) => b.modified.localeCompare(a.modified));
@@ -1068,7 +1071,11 @@ export async function fetchColumn(
     if (kind !== "story" && refs.length > 0) {
       storyTitles = await resolveStoryTitles(config, refs);
     }
+    const seenIds = new Set<string>();
     for (const ref of refs) {
+      const key = `${ref.workspaceId}-${String(ref.row?.id ?? "")}`;
+      if (seenIds.has(key)) continue;
+      seenIds.add(key);
       items.push(toSummary(config, ref.workspaceId, kind, ref.row, labels, iterationMap, storyTitles));
     }
     if (total > refs.length) truncated = true;

@@ -11,7 +11,7 @@ import {
   SettingsSection,
   SettingsSwitch,
 } from "@getpaseo/plugin/client/ui";
-import { checkRpc, tapdSettings } from "../../shared/contracts";
+import { checkRpc, syncPullRpc, syncPushRpc, tapdSettings } from "../../shared/contracts";
 import { PLUGIN_VERSION } from "../../shared/version";
 import type { WorkbenchTheme } from "./bits";
 import { ViewsSection, type ReadySettings } from "./ViewsSection";
@@ -128,6 +128,7 @@ function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: W
         </SettingsCard>
       </SettingsSection>
       <ViewsSection theme={theme} settings={settings} />
+      <SyncSettingsSection settings={settings} theme={theme} />
       <SettingsSection title="Agent">
         <SettingsCard>
           <SettingsSwitch
@@ -172,5 +173,94 @@ function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: W
         插件在 daemon 侧调用 TAPD OpenAPI，凭证仅保存在本机。当前版本 v{PLUGIN_VERSION}。
       </Text>
     </View>
+  );
+}
+
+function SyncSettingsSection({ settings, theme }: { settings: ReadySettings; theme: WorkbenchTheme }) {
+  const [gitUrl, setGitUrl] = useState(settings.values.syncGitUrl);
+  const [gitToken, setGitToken] = useState(settings.values.syncGitToken);
+  const [branch, setBranch] = useState(settings.values.syncBranch);
+  const [busy, setBusy] = useState<"push" | "pull" | null>(null);
+  const toast = useToast();
+  const push = useRpc(syncPushRpc);
+  const pull = useRpc(syncPullRpc);
+
+  async function saveSyncConfig(): Promise<boolean> {
+    return settings.save(
+      {
+        ...settings.values,
+        syncGitUrl: gitUrl.trim(),
+        syncGitToken: gitToken.trim(),
+        syncBranch: branch.trim() || "main",
+      },
+      settings.revision,
+    );
+  }
+
+  async function runSync(kind: "push" | "pull") {
+    setBusy(kind);
+    try {
+      if (!(await saveSyncConfig())) throw new Error(settings.saveError ?? "同步配置保存失败");
+      if (kind === "push") {
+        toast.show((await push({})).message, { variant: "success" });
+      } else {
+        const pulled = await pull({});
+        const merged = { ...settings.values, ...(pulled.values as Partial<typeof settings.values>) };
+        const ok = await settings.save(merged, settings.revision);
+        if (!ok) throw new Error(settings.saveError ?? "拉取内容写入失败，请再次点击拉取");
+        toast.show("已从 Git 恢复配置", { variant: "success" });
+        await settings.reload();
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const hintStyle = useMemo<TextStyle>(() => ({ color: theme.colors.foregroundMuted, fontSize: 11, lineHeight: 16 }), [theme]);
+
+  return (
+    <SettingsSection title="配置同步（Git）">
+      <SettingsCard>
+        <SettingsInput
+          label="Git 仓库地址"
+          hint="常用 https:// 地址（私有仓库需令牌）；推荐单独建一个空仓库，插件在其中维护 tapd-workbench-settings.json"
+          placeholder="https://github.com/you/paseo-config.git"
+          initialValue={settings.values.syncGitUrl}
+          onChangeText={setGitUrl}
+        />
+        <SettingsInput
+          label="Git 访问令牌"
+          hint="不会写入同步文件，也不会注入 Agent 会话；只在本地提交时使用"
+          placeholder="GitHub/GitLab access token"
+          secureTextEntry
+          initialValue={settings.values.syncGitToken}
+          onChangeText={setGitToken}
+        />
+        <SettingsInput
+          label="分支"
+          hint="默认 main"
+          placeholder="main"
+          initialValue={settings.values.syncBranch}
+          onChangeText={setBranch}
+        />
+        <SettingsAction
+          label="推送到 Git 备份"
+          actionLabel={busy === "push" ? "推送中…" : "推送"}
+          disabled={busy !== null}
+          onPress={() => void runSync("push")}
+        />
+        <SettingsAction
+          label="从 Git 恢复（覆盖本地视图/关联等）"
+          actionLabel={busy === "pull" ? "拉取中…" : "拉取"}
+          disabled={busy !== null}
+          onPress={() => void runSync("pull")}
+        />
+        <Text style={hintStyle}>
+          同步内容：视图、收藏、看板列、关联记录、Agent 自动回评开关等设置。不推送的隐私字段：TAPD Token、项目 ID、Git 令牌、派活仓库路径，均只保留在本机。
+        </Text>
+      </SettingsCard>
+    </SettingsSection>
   );
 }
