@@ -27,6 +27,8 @@ export interface DetailExtras {
   onDispatch?: (data: EntityDetailData) => void;
   onComment?: (data: EntityDetailData) => void;
   onStatus?: (data: EntityDetailData) => void;
+  /** 需求详情：一键创建挂在该需求下的任务/缺陷 */
+  onCreateChild?: (data: EntityDetailData, childKind: "task" | "bug") => void;
   /** 在详情面板中打开另一个单据（点击需求下的任务/缺陷行） */
   onOpenEntity?: (target: DetailTarget) => void;
 }
@@ -325,6 +327,28 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
           <Icon name="Copy" size={14} color={theme.colors.foreground} />
           <Text style={styles.actionLabel}>复制链接</Text>
         </Pressable>
+        {kind === "story" && extras.onCreateChild ? (
+          <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="创建该需求下的任务"
+              style={styles.action}
+              onPress={() => extras.onCreateChild?.(data, "task")}
+            >
+              <Icon name="Plus" size={14} color={theme.colors.foreground} />
+              <Text style={styles.actionLabel}>+ 任务</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="创建该需求下的缺陷"
+              style={styles.action}
+              onPress={() => extras.onCreateChild?.(data, "bug")}
+            >
+              <Icon name="Bug" size={14} color={theme.colors.foreground} />
+              <Text style={styles.actionLabel}>+ 缺陷</Text>
+            </Pressable>
+          </>
+        ) : null}
         <Pressable accessibilityRole="button" style={styles.action} onPress={() => void detail.refetch()}>
           <Icon name="RefreshCw" size={14} color={theme.colors.foreground} />
           <Text style={styles.actionLabel}>刷新</Text>
