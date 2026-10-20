@@ -38,7 +38,8 @@ export function DatePicker({ theme, value, onChange }: {
     () =>
       ({
         section: { backgroundColor: theme.colors.surface1, borderRadius: 10, padding: 12, gap: 8 },
-        header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+        header: { flexDirection: "row", alignItems: "center", gap: 8 },
+        headerGap: { flex: 1 },
         navButton: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, backgroundColor: theme.colors.surface0 },
         navText: { fontSize: 14, color: theme.colors.foreground },
         monthText: { fontSize: 13, fontWeight: "600", color: theme.colors.foreground },
@@ -54,6 +55,14 @@ export function DatePicker({ theme, value, onChange }: {
         cellTextToday: { color: theme.colors.accent, fontWeight: "600" },
         footerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
         valueText: { fontSize: 11, color: theme.colors.foregroundMuted },
+        quickRow: { flexDirection: "row", gap: 6 },
+        quickButton: {
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 8,
+          backgroundColor: theme.colors.surface0,
+        },
+        quickText: { fontSize: 12, color: theme.colors.foreground },
       }) satisfies Record<string, ViewStyle | TextStyle>,
     [theme],
   );
@@ -79,6 +88,20 @@ export function DatePicker({ theme, value, onChange }: {
   return (
     <View style={styles.section}>
       <View style={styles.header}>
+        <View style={styles.quickRow}>
+          {([["昨天", -1], ["今天", 0], ["明天", 1]] as const).map(([label, offsetDays]) => (
+            <Pressable
+              key={label}
+              accessibilityRole="button"
+              accessibilityLabel={`选择${label}`}
+              style={styles.quickButton}
+              onPress={() => onChange(dateKeyOf(addDays(new Date(), offsetDays)))}
+            >
+              <Text style={styles.quickText}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.headerGap} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="上一月"

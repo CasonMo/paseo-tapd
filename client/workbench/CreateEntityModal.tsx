@@ -12,6 +12,11 @@ function parseKey(key: string): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
 }
 
+/** fields_info 的 text 自定义字段常被管理员拿来存日期（如「开始时间」「结束时间」），按 label/key 猜日期语义启用日历 */
+function looksLikeDateField(field: { key: string; label: string }): boolean {
+  return /时间|日期/.test(field.label) || /date|time/i.test(field.key);
+}
+
 const KIND_TITLES: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
 
 type ModalMode = { name: "form" } | { name: "iteration" } | { name: "date"; fieldKey: string };
@@ -389,7 +394,7 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
                     </View>
                   );
                 }
-                if (field.inputKind === "date") {
+                if (field.inputKind === "date" || looksLikeDateField(field)) {
                   const dateValue = value ? parseKey(value) : null;
                   return (
                     <Pressable
