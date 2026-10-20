@@ -46,7 +46,7 @@ export function HoverTip({ tip, theme, children, style, top = 30, tipWidth }: {
       right: tipWidth == null ? 0 : undefined,
       width: tipWidth,
       zIndex: 50,
-      backgroundColor: dark ? "#17181c" : "#ffffff",
+      backgroundColor: dark ? "#26282f" : "#f7f7f9",
       borderColor: theme.colors.border,
       borderWidth: 1,
       borderRadius: 8,

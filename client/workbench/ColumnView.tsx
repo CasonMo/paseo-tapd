@@ -116,9 +116,10 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
       gap: 6,
       opacity: entity.done ? 0.7 : 1,
     },
-    titleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+    // 带 HoverTip 的行需要整体提级，tip 才能盖住 DOM 靠后的兄弟行
+    titleRow: { flexDirection: "row", alignItems: "center", gap: 6, zIndex: 50 },
     title: { color: theme.colors.foreground, fontSize: 13, lineHeight: 18, flex: 1 },
-    meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
+    meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, zIndex: 49 },
     subRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     sub: { color: theme.colors.foregroundMuted, fontSize: 11, flex: 1 },
     storyChip: { color: theme.colors.foregroundMuted, fontSize: 10 },
