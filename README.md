@@ -11,7 +11,7 @@ A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo works
 - Detail window with description, comments, open-in-TAPD, and copy-link; story details additionally list the tasks and bugs attached to the story (paginated, with a truncation hint past 200), and task/bug details link back to their parent story
 - Task/bug cards show `#id` on its own line under the title plus a "story: title" chip; details-page child-list row titles show the full text in a hover tooltip
 - Dispatch to an agent: pick a repository and provider/model; the plugin creates a worktree workspace and starts an agent preloaded with the item snapshot, then tracks it from the card
-- Write back to TAPD: comments (plain text converted to HTML), workflow status changes, and new item creation — story details can one-click create a task or bug under that story, prefilled with the parent (story_id) and the story's workspace
+- Write back to TAPD: comments (plain text converted to HTML), workflow status changes, and new item creation — story details can one-click create a task or bug under that story, prefilled with the parent (story_id) and the story's workspace; the mounted form lists the type's writable TAPD fields dynamically (dropdowns for enum/user fields, a month calendar with yesterday/today/tomorrow shortcuts for date-like fields), defaults the owner to the current token user, and its field layout (order + hidden) is kept per entity type and backed up via settings sync
 - Attachment source: search TAPD items while composing a prompt and attach a snapshot
 - Agent binding: pick an agent from the item detail window to link it to the item; the prompt is prefilled with a default notice (editable) so sending notifies the agent — clear the field to bind silently; agent sessions still receive the TAPD environment variables (when not already defined) so a linked agent can query and update TAPD
 - Settings sync via Git: point the plugin at your own Git repository (URL + access token in settings) and push a backup, or pull to restore views, favorites, board columns, item↔agent links, and switches after uninstall/reinstall; the synced file is `tapd-workbench-settings.json`; privacy-sensitive fields never leave the machine: the TAPD token, project IDs, the Git token, and the local dispatch repo path
@@ -84,7 +84,7 @@ MIT
 - 看板秒开：89 秒内的看板数据直接复用（同一过滤条件各自独立缓存）；过期先显示上次数据并在顶部提示「后台刷新中…」，同时后台重拉，刷新完成后自动更新；「刷新」按钮强制绕过缓存
 - Agent 状态：看板卡片「已关联」标签内的小圆点与详情面板「关联任务」行实时显示 Agent 状态（运行中绿 / 启动中黄 / 异常红 / 空闲或已关闭灰），详情面板还可展开查看最近一次工作结果摘要，事件流驱动、随 Agent 动态刷新
 - Agent 自动回评：设置 → Agent 开关打开后，派给已关联单据的 Agent 每跑完一轮，自动把结果摘要作为评论写回该单据（默认关闭）
-- 回写 TAPD：评论（纯文本自动转 HTML）、工作流状态变更、新建单据；需求详情可一键创建挂在该需求下的任务/缺陷，自动预挂父需求（story_id）并写入需求所属项目
+- 回写 TAPD：评论（纯文本自动转 HTML）、工作流状态变更、新建单据；需求详情可一键创建挂在该需求下的任务/缺陷，自动预挂父需求（story_id）并写入需求所属项目；挂载表单动态列出该类型的可写字段（枚举/人员字段出选项、日期及「开始/结束时间」类字段出月历含昨天/今天/明天快捷项），处理人默认当前登录用户，字段顺序与隐藏布局按类型记忆并随设置同步备份
 - 附件源：撰写提示词时搜索 TAPD 单据并附上快照
 - Agent 绑定：在单据详情浮窗中选择一个 Agent 关联该单据；提示词默认填入标准跟进通知，可直接发送、修改后发送，或清空只绑定；Agent 会话会在未定义时注入 TAPD 环境变量，使其可直接查询与更新 TAPD
 - 配置同步（Git）：在设置里填自己的 Git 仓库地址与访问令牌，可把视图 / 收藏 / 看板列 / 单据关联记录 / 开关等设置一键推送备份，或从仓库拉取恢复（卸载重装后凭此找回关联）；同步文件为仓库根目录的 `tapd-workbench-settings.json`，隐私字段不出本机：TAPD Token、项目 ID、Git 令牌、派活仓库路径均不参与同步
