@@ -228,6 +228,10 @@ const entitySummarySchema = z.object({
   modified: z.string(),
   done: z.boolean(),
   url: z.string(),
+  /** 仅任务/缺陷：所属需求 ID（空 = 无关联需求） */
+  storyId: z.string().default(""),
+  /** 所属需求标题（尽力解析，解析失败为空） */
+  storyTitle: z.string().default(""),
 });
 
 const columnSchema = z.object({
@@ -309,13 +313,25 @@ export const createRpc = defineRpc({
 
 export const updateStatusRpc = defineRpc({
   name: "tapd.update_status",
-  input: z.object({ kind: entityKindSchema, id: z.string(), status: z.string() }),
+  input: z.object({
+    kind: entityKindSchema,
+    id: z.string(),
+    status: z.string(),
+    /** 单据实际所在项目；为空回退首个配置项目 */
+    workspaceId: z.string().default(""),
+  }),
   output: z.object({ ok: z.boolean() }),
 });
 
 export const addCommentRpc = defineRpc({
   name: "tapd.add_comment",
-  input: z.object({ kind: entityKindSchema, id: z.string(), text: z.string() }),
+  input: z.object({
+    kind: entityKindSchema,
+    id: z.string(),
+    text: z.string(),
+    /** 单据实际所在项目；为空回退首个配置项目 */
+    workspaceId: z.string().default(""),
+  }),
   output: z.object({ ok: z.boolean() }),
 });
 
@@ -335,6 +351,8 @@ export const entityRpc = defineRpc({
   output: z.object({
     kind: entityKindSchema,
     id: z.string(),
+    /** 单据实际所在项目（回写状态/评论用） */
+    workspaceId: z.string().default(""),
     title: z.string(),
     url: z.string(),
     status: z.string(),
@@ -359,6 +377,9 @@ export const entityRpc = defineRpc({
     childTasks: z.array(entityChildItemSchema).default([]),
     /** 仅需求：该需求下挂的缺陷 */
     childBugs: z.array(entityChildItemSchema).default([]),
+    /** 仅需求：子单据真实总数（> 上限 200 说明列表被截断；0 = 未统计） */
+    childTasksTotal: z.number().default(0),
+    childBugsTotal: z.number().default(0),
     /** 仅任务/缺陷：所属需求 */
     parentStory: z.object({ id: z.string(), title: z.string(), url: z.string() }).nullable().default(null),
   }),

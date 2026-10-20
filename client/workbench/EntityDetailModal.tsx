@@ -331,10 +331,24 @@ function DetailBody({ target, theme, extras }: { target: DetailTarget | null; th
         );
       })()}
       {data.kind === "story" && data.childTasks.length > 0 ? (
-        <ChildListSection key={`${data.id}-task`} label="需求下任务" items={data.childTasks} theme={theme} extras={extras} />
+        <ChildListSection
+          key={`${data.id}-task`}
+          label="需求下任务"
+          items={data.childTasks}
+          totalHint={data.childTasksTotal > data.childTasks.length ? `前 ${data.childTasks.length} / 共 ${data.childTasksTotal} 条` : undefined}
+          theme={theme}
+          extras={extras}
+        />
       ) : null}
       {data.kind === "story" && data.childBugs.length > 0 ? (
-        <ChildListSection key={`${data.id}-bug`} label="需求下缺陷" items={data.childBugs} theme={theme} extras={extras} />
+        <ChildListSection
+          key={`${data.id}-bug`}
+          label="需求下缺陷"
+          items={data.childBugs}
+          totalHint={data.childBugsTotal > data.childBugs.length ? `前 ${data.childBugs.length} / 共 ${data.childBugsTotal} 条` : undefined}
+          theme={theme}
+          extras={extras}
+        />
       ) : null}
       <Text style={styles.section}>描述</Text>
       <View style={styles.box}>
@@ -380,9 +394,11 @@ function openParentStory(
 }
 
 /** 需求详情：该需求下挂的任务/缺陷列表（10 条一页，可翻页） */
-function ChildListSection({ label, items, theme, extras }: {
+function ChildListSection({ label, items, totalHint, theme, extras }: {
   label: string;
   items: readonly EntityChildItem[];
+  /** 非 undefined 表示列表被上限截断，如「前 200 / 共 235 条」 */
+  totalHint?: string;
   theme: WorkbenchTheme;
   extras: DetailExtras;
 }) {
@@ -435,7 +451,7 @@ function ChildListSection({ label, items, theme, extras }: {
 
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.section}>{label}（{items.length}）</Text>
+      <Text style={styles.section}>{label}（{totalHint ?? items.length}）</Text>
       {visible.map((item) => (
         <Pressable
           key={item.id}

@@ -8,7 +8,8 @@ A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo works
 
 - Aggregate tab (stories / tasks / bugs side by side, with collapsible status groups) plus one tab per type with a status-column kanban; selectable columns, colored status labels, and starred pinning
 - Views as reusable filter presets: built-in "Related to me" (owner, creator, developer, participator, watcher, or commenter, plus linked-task involvement), plus keyword, owner, creator, status scope, iteration, updated-within, priorities, bug severities, labels, and any field from the workspace's TAPD field definitions
-- Detail window with description, comments, open-in-TAPD, and copy-link
+- Detail window with description, comments, open-in-TAPD, and copy-link; story details additionally list the tasks and bugs attached to the story (paginated, with a truncation hint past 200), and task/bug details link back to their parent story
+- Card quick actions: hover icons on each card to dispatch to an agent or change status without opening the detail window; task/bug cards carry a "story: title" chip; column lists render through virtualized FlatList
 - Dispatch to an agent: pick a repository and provider/model; the plugin creates a worktree workspace and starts an agent preloaded with the item snapshot, then tracks it from the card
 - Write back to TAPD: comments (plain text converted to HTML), workflow status changes, and new item creation
 - Attachment source: search TAPD items while composing a prompt and attach a snapshot
@@ -43,7 +44,7 @@ Pick an agent from the item detail window to link the item to that conversation.
 - No credentials are stored in this repository. The token is used only by the daemon-side plugin, as the TAPD `Authorization` header.
 - Prefer environment variables (`TAPD_TOKEN`, `TAPD_WORKSPACE_IDS`). A token saved in the plugin settings is stored as plain JSON on the daemon host and is readable by the connected settings interface.
 - The plugin calls only the TAPD OpenAPI. The API base URL and web link base can be overridden per daemon with `TAPD_API_ENDPOINT` and `TAPD_SITE_URL`.
-- Reads cover every configured project. Write operations (comments, status changes, item creation) target the first configured TAPD project.
+- Reads cover every configured project. Write operations (comments, status changes, item creation) target the item's actual project when known, falling back to the first configured TAPD project.
 - Agent dispatch sends the item snapshot (used as the prompt) to the selected agent provider through the Paseo SDK.
 - Update checks fetch the public registry record and this repository's manifest at the pinned commit from GitHub (`raw.githubusercontent.com`, falling back to `api.github.com`). No credentials are attached and no user data is sent; the result is cached for an hour.
 
@@ -73,7 +74,8 @@ MIT
 
 - 聚合页签（需求 / 任务 / 缺陷三栏并排，按状态分组可折叠）+ 每个类型一个独立页签的状态列看板；列可自选、状态标签带颜色、卡片可加星置顶
 - 视图 = 可复用的过滤预设：内置「我相关的」（负责人、创建人、开发、参与、关注或评论过，以及关联任务涉及我），另支持关键词、负责人、创建人、状态范围、迭代、最近更新时间、优先级、缺陷严重程度、标签，以及工作区 TAPD 字段定义中的任意字段
-- 单据详情浮窗：描述、评论、在 TAPD 中打开、复制链接；需求详情额外展示该需求下挂的任务列表与缺陷列表（点击可切换到对应单据详情）；任务/缺陷详情显示所属需求入口；关联的 Agent 以名称显示，悬停行可预览创建时提示词的前 200 字
+- 单据详情浮窗：描述、评论、在 TAPD 中打开、复制链接；需求详情额外展示该需求下挂的任务列表与缺陷列表（分页展示，超过 200 条时显示「前 200 / 共 N 条」截断提示，点击可切换到对应单据详情）；任务/缺陷详情显示所属需求入口；关联的 Agent 以名称显示，悬停行可预览创建时提示词的前 200 字
+- 卡片快捷操作：卡片上悬停图标可直接派给 Agent 或改状态，无需先打开详情；任务/缺陷卡片显示「需求：所属需求」标识；看板长列表用 FlatList 虚拟化渲染
 - 派给 Agent：选择仓库与 provider/model；插件创建 worktree 工作区并启动一个预置了单据快照的 Agent，之后可从卡片追踪
 - 回写 TAPD：评论（纯文本自动转 HTML）、工作流状态变更、新建单据
 - 附件源：撰写提示词时搜索 TAPD 单据并附上快照
@@ -108,7 +110,7 @@ paseo plugin add git:<repo-url>
 - 本仓库不存储任何凭据。Token 仅由 daemon 侧插件使用，作为 TAPD 的 `Authorization` 头。
 - 优先使用环境变量（`TAPD_TOKEN`、`TAPD_WORKSPACE_IDS`）。保存在插件设置中的 token 以明文 JSON 存于 daemon 主机，可被已连接的设置界面读取。
 - 插件只调用 TAPD OpenAPI。API 基地址与网页链接基地址可用 `TAPD_API_ENDPOINT`、`TAPD_SITE_URL` 按 daemon 覆盖。
-- 读取覆盖所有已配置项目。写操作（评论、状态变更、建单）只作用于第一个配置的 TAPD 项目。
+- 读取覆盖所有已配置项目。写操作（评论、状态变更、建单）优先作用于单据实际所在项目（无法确定时回退第一个配置的 TAPD 项目）。
 - 派给 Agent 时，单据快照（作为提示词）经 Paseo SDK 发送给所选的 agent provider。
 - 更新检查从 GitHub 拉取公开的 registry 记录与固定提交处的本仓库清单（`raw.githubusercontent.com`，失败时回退 `api.github.com`），不附带凭据、不发送用户数据，结果缓存一小时。
 

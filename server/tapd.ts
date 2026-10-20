@@ -28,6 +28,10 @@ export interface EntitySummary {
   modified: string;
   done: boolean;
   url: string;
+  /** 仅任务/缺陷：所属需求 ID（story_id；为空或 0 表示无） */
+  storyId?: string;
+  /** 所属需求标题（尽力解析，未解析时为空） */
+  storyTitle?: string;
 }
 
 export interface ColumnResult {
@@ -59,6 +63,8 @@ export interface EntityChildItem {
 export interface EntityDetailResult {
   kind: EntityKind;
   id: string;
+  /** 单据实际所在项目（回写状态/评论必须发到这个项目） */
+  workspaceId: string;
   title: string;
   url: string;
   status: string;
@@ -76,6 +82,9 @@ export interface EntityDetailResult {
   childTasks: EntityChildItem[];
   /** 仅需求：该需求下挂的缺陷（TAPD bug.story_id） */
   childBugs: EntityChildItem[];
+  /** 仅需求：任务/缺陷真实总数（> 列表长度说明列表被 limit 200 截断；0 = 未知/未统计） */
+  childTasksTotal: number;
+  childBugsTotal: number;
   /** 仅任务/缺陷：所属需求（TAPD task.story_id / bug.story_id） */
   parentStory: { id: string; title: string; url: string } | null;
 }
@@ -112,8 +121,8 @@ const FIELDS_INFO_PATH: Record<EntityKind, string> = {
 
 const LIST_FIELDS: Record<EntityKind, string> = {
   story: "id,name,status,owner,priority_label,iteration_id,modified",
-  task: "id,name,status,owner,priority_label,iteration_id,modified",
-  bug: "id,title,status,current_owner,priority_label,iteration_id,modified",
+  task: "id,name,status,owner,priority_label,iteration_id,modified,story_id",
+  bug: "id,title,status,current_owner,priority_label,iteration_id,modified,story_id",
 };
 
 // 终态状态：默认「隐藏已完成」时过滤掉这些状态。
@@ -426,30 +435,32 @@ export async function fetchFilterOptions(config: TapdConfig): Promise<{
   return { priorities, severities, iterations, statuses };
 }
 
-/** 状态流转：POST 更新单据状态 */
+/** 状态流转：POST 更新单据状态（workspaceId 为空时回退首个项目） */
 export async function updateEntityStatus(
   config: TapdConfig,
+  workspaceId: string,
   kind: EntityKind,
   id: string,
   status: string,
 ): Promise<void> {
-  const workspaceId = config.workspaceIds[0] ?? "";
-  await requestPost(config, LIST_PATH[kind], { workspace_id: workspaceId, id, status });
+  const resolved = workspaceId.trim() || (config.workspaceIds[0] ?? "");
+  await requestPost(config, LIST_PATH[kind], { workspace_id: resolved, id, status });
   clearTapdCache();
 }
 
-/** 回写评论：POST 新评论（HTML 格式） */
+/** 回写评论：POST 新评论（HTML 格式）（workspaceId 为空时回退首个项目） */
 export async function addComment(
   config: TapdConfig,
+  workspaceId: string,
   kind: EntityKind,
   id: string,
   text: string,
   author: string,
 ): Promise<void> {
-  const workspaceId = config.workspaceIds[0] ?? "";
+  const resolved = workspaceId.trim() || (config.workspaceIds[0] ?? "");
   const entryType = kind === "story" ? "stories" : kind === "bug" ? "bug" : "tasks";
   const params: Record<string, QueryValue> = {
-    workspace_id: workspaceId,
+    workspace_id: resolved,
     entry_type: entryType,
     entry_id: id,
     description: `<p>${escapeHtmlText(text).replace(/\n/g, "<br/>")}</p>`,
@@ -528,10 +539,13 @@ function toSummary(
   row: any,
   labels: Record<string, string>,
   iterationMap: Map<string, string>,
+  storyTitles?: Map<string, string>,
 ): EntitySummary {
   const id = String(row?.id ?? "");
   const status = String(row?.status ?? "");
   const iterationId = String(row?.iteration_id ?? "");
+  const storyId = kind === "story" ? "" : String(row?.story_id ?? "").trim();
+  const storyKey = storyId && storyId !== "0" ? `${workspaceId}-${storyId}` : "";
   return {
     kind,
     id,
@@ -544,7 +558,45 @@ function toSummary(
     modified: String(row?.modified ?? ""),
     done: TERMINAL_STATUSES[kind].includes(status),
     url: entityUrl(config, workspaceId, kind, id),
+    storyId: storyKey ? storyId : "",
+    storyTitle: storyTitles?.get(storyKey) ?? "",
   };
+}
+
+/** 按工作区批量解析任务/缺陷所属需求的标题（TAPD 支持 id 逗号列表查询） */
+async function resolveStoryTitles(
+  config: TapdConfig,
+  refs: EntityRowRef[],
+): Promise<Map<string, string>> {
+  const idsByWorkspace = new Map<string, Set<string>>();
+  for (const ref of refs) {
+    const storyId = String(ref.row?.story_id ?? "").trim();
+    if (!storyId || storyId === "0") continue;
+    const set = idsByWorkspace.get(ref.workspaceId) ?? new Set();
+    set.add(storyId);
+    idsByWorkspace.set(ref.workspaceId, set);
+  }
+  const titles = new Map<string, string>();
+  for (const [workspaceId, set] of idsByWorkspace) {
+    const ids = [...set];
+    for (let start = 0; start < ids.length; start += 100) {
+      try {
+        const data = await requestJson(config, "/stories", {
+          workspace_id: workspaceId,
+          id: ids.slice(start, start + 100).join(","),
+          limit: 100,
+          fields: "id,name",
+        });
+        for (const row of unwrapRows(data, ["Story"])) {
+          const key = `${workspaceId}-${String(row?.id ?? "")}`;
+          titles.set(key, String(row?.name ?? "").trim());
+        }
+      } catch {
+        // 需求标题解析失败不阻塞看板
+      }
+    }
+  }
+  return titles;
 }
 
 export interface ColumnQueryOptions {
@@ -935,14 +987,22 @@ export async function fetchColumn(
       );
       const seen = new Set<string>();
       const merged: EntitySummary[] = [];
+      const allRefs: EntityRowRef[] = [];
       for (const batch of batches) {
         for (const ref of batch) {
+          allRefs.push(ref);
           const key = `${ref.workspaceId}-${String(ref.row?.id ?? "")}`;
           if (seen.has(key)) continue;
           seen.add(key);
           merged.push(toSummary(config, ref.workspaceId, kind, ref.row, labels, iterationMap));
         }
         if (batch.length >= 200) truncated = true;
+      }
+      if (kind !== "story" && merged.length > 0) {
+        const storyTitles = await resolveStoryTitles(config, allRefs);
+        for (let index = 0; index < merged.length; index += 1) {
+          merged[index] = toSummary(config, allRefs[index].workspaceId, kind, allRefs[index].row, labels, iterationMap, storyTitles);
+        }
       }
       merged.sort((a, b) => b.modified.localeCompare(a.modified));
       total = merged.length;
@@ -963,8 +1023,12 @@ export async function fetchColumn(
       [ownerParamName(kind)]: options.owner || undefined,
       ...dimensionParams,
     });
+    let storyTitles: Map<string, string> | undefined;
+    if (kind !== "story" && refs.length > 0) {
+      storyTitles = await resolveStoryTitles(config, refs);
+    }
     for (const ref of refs) {
-      items.push(toSummary(config, ref.workspaceId, kind, ref.row, labels, iterationMap));
+      items.push(toSummary(config, ref.workspaceId, kind, ref.row, labels, iterationMap, storyTitles));
     }
     if (total > refs.length) truncated = true;
   } catch (error) {
@@ -997,6 +1061,7 @@ export async function fetchEntity(config: TapdConfig, kind: EntityKind, id: stri
   const detail: EntityDetailResult = {
     kind,
     id: String(row.id ?? id),
+    workspaceId,
     title: String((kind === "bug" ? row.title : row.name) ?? ""),
     url: entityUrl(config, workspaceId, kind, id),
     status,
@@ -1012,6 +1077,8 @@ export async function fetchEntity(config: TapdConfig, kind: EntityKind, id: stri
     commentsError: null,
     childTasks: [],
     childBugs: [],
+    childTasksTotal: 0,
+    childBugsTotal: 0,
     parentStory: null,
   };
 
@@ -1090,9 +1157,27 @@ export async function fetchEntity(config: TapdConfig, kind: EntityKind, id: stri
         return []; // 子单据读取失败不阻塞需求详情
       }
     };
+    const countChildren = async (childKind: Exclude<EntityKind, "story">): Promise<number> => {
+      try {
+        const data = await requestJson(config, COUNT_PATH[childKind], {
+          workspace_id: workspaceId,
+          story_id: id,
+        });
+        const count = Number(data?.count ?? 0);
+        return Number.isFinite(count) ? count : 0;
+      } catch {
+        return 0;
+      }
+    };
     const [tasks, bugs] = await Promise.all([loadChildren("task"), loadChildren("bug")]);
+    const [taskTotal, bugTotal] = await Promise.all([
+      tasks.length >= 200 ? countChildren("task") : Promise.resolve(0),
+      bugs.length >= 200 ? countChildren("bug") : Promise.resolve(0),
+    ]);
     detail.childTasks = tasks;
     detail.childBugs = bugs;
+    detail.childTasksTotal = taskTotal;
+    detail.childBugsTotal = bugTotal;
   }
   return detail;
 }

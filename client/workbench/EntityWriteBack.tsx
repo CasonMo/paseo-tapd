@@ -7,12 +7,14 @@ import { addCommentRpc, filterOptionsRpc, updateStatusRpc, type EntityKind } fro
 import { type WorkbenchTheme } from "./bits";
 
 /** 快捷修改单据状态（状态选项来自字段信息，动态获取） */
-export function StatusModal({ open, onClose, theme, kind, id, current, onDone }: {
+export function StatusModal({ open, onClose, theme, kind, id, workspaceId, current, onDone }: {
   open: boolean;
   onClose: () => void;
   theme: WorkbenchTheme;
   kind: EntityKind;
   id: string;
+  /** 单据实际所在项目（多项目配置时保证回写正确） */
+  workspaceId?: string;
   current: string;
   onDone: () => void;
 }) {
@@ -39,7 +41,7 @@ export function StatusModal({ open, onClose, theme, kind, id, current, onDone }:
     if (submitting) return;
     setSubmitting(value);
     try {
-      await updateStatus({ kind, id, status: value });
+      await updateStatus({ kind, id, status: value, workspaceId: workspaceId ?? "" });
       toast.show(`状态已更新为「${label}」`, { variant: "success" });
       onDone();
       onClose();
@@ -97,12 +99,14 @@ export function StatusModal({ open, onClose, theme, kind, id, current, onDone }:
 }
 
 /** 写回评论（纯文本自动转 HTML） */
-export function CommentModal({ open, onClose, theme, kind, id, onDone }: {
+export function CommentModal({ open, onClose, theme, kind, id, workspaceId, onDone }: {
   open: boolean;
   onClose: () => void;
   theme: WorkbenchTheme;
   kind: EntityKind;
   id: string;
+  /** 单据实际所在项目（多项目配置时保证回写正确） */
+  workspaceId?: string;
   onDone: () => void;
 }) {
   const addComment = useRpc(addCommentRpc);
@@ -122,7 +126,7 @@ export function CommentModal({ open, onClose, theme, kind, id, onDone }: {
     if (!trimmed || submitting) return;
     setSubmitting(true);
     try {
-      await addComment({ kind, id, text: trimmed });
+      await addComment({ kind, id, text: trimmed, workspaceId: workspaceId ?? "" });
       toast.show("评论已写入 TAPD", { variant: "success" });
       onDone();
       onClose();

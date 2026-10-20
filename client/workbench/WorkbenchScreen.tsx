@@ -4,7 +4,7 @@ import { Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
-import { boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, updateCheckRpc, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
+import { boardRpc, effectiveViews, entityRpc, filterOptionsRpc, resolveView, tapdSettings, updateCheckRpc, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
 import { Chip, ToolbarButton } from "./bits";
 import { BindAgentModal } from "./BindAgentModal";
 import { ColumnPickerModal } from "./ColumnPickerModal";
@@ -58,8 +58,10 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
   const [activeTab, setActiveTab] = useState<ActiveTab>("all");
   const [detailVersion, setDetailVersion] = useState(0);
   const [dispatchTarget, setDispatchTarget] = useState<EntityDetailData | null>(null);
-  const [commentTarget, setCommentTarget] = useState<EntityDetailData | null>(null);
-  const [statusTarget, setStatusTarget] = useState<EntityDetailData | null>(null);
+  type CommentTarget = { kind: EntityKind; id: string; workspaceId?: string };
+  type StatusTarget = CommentTarget & { current: string };
+  const [commentTarget, setCommentTarget] = useState<CommentTarget | null>(null);
+  const [statusTarget, setStatusTarget] = useState<StatusTarget | null>(null);
   const [bindTarget, setBindTarget] = useState<EntityDetailData | null>(null);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [boardHeight, setBoardHeight] = useState(0);
@@ -86,6 +88,8 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     staleTime: 600_000,
     retry: 1,
   });
+
+  const fetchEntityDetail = useRpc(entityRpc);
 
   const fetchUpdateCheck = useRpc(updateCheckRpc);
   const updateQuery = useQuery({
@@ -321,10 +325,25 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     onRemoveLink: (link) => void handleRemoveLink(link),
     onDispatch: (data) => setDispatchTarget(data),
     onBindAgent: (data) => setBindTarget(data),
-    onComment: (data) => setCommentTarget(data),
-    onStatus: (data) => setStatusTarget(data),
+    onComment: (data) => setCommentTarget({ kind: data.kind, id: data.id, workspaceId: data.workspaceId }),
+    onStatus: (data) => setStatusTarget({ kind: data.kind, id: data.id, current: data.status, workspaceId: data.workspaceId }),
     onOpenEntity: (target) => setDetail(target),
   };
+
+  /** 卡片快捷派发：先取详情（buildPrompt 需要描述）再打开派发弹窗 */
+  async function quickDispatch(entity: BoardEntityItem) {
+    try {
+      const data = await fetchEntityDetail({ kind: entity.kind, id: entity.id });
+      setDispatchTarget(data);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /** 卡片快捷改状态：看板行已带 status，无需取详情 */
+  function quickStatus(entity: BoardEntityItem) {
+    setStatusTarget({ kind: entity.kind, id: entity.id, current: entity.status });
+  }
 
   return (
     <View style={styles.screen}>
@@ -422,11 +441,13 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                       grouped={groupByStatus}
                       favorites={favorites}
                       linkedKeys={linkedKeys}
-                      onToggleFavorite={(key) => void toggleFavorite(key)}
-                      onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
-                    />
-                  ))}
-                </ScrollView>
+                       onToggleFavorite={(key) => void toggleFavorite(key)}
+                       onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
+                       onQuickDispatch={(entity) => void quickDispatch(entity)}
+                       onQuickStatus={(entity) => quickStatus(entity)}
+                     />
+                   ))}
+                 </ScrollView>
               </View>
             ) : (
               <View style={{ flex: 1, flexDirection: "row", gap: 12, minHeight: 0 }}>
@@ -447,6 +468,8 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                     linkedKeys={linkedKeys}
                     onToggleFavorite={(key) => void toggleFavorite(key)}
                     onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
+                    onQuickDispatch={(entity) => void quickDispatch(entity)}
+                    onQuickStatus={(entity) => quickStatus(entity)}
                   />
                 ))}
               </View>
@@ -475,6 +498,8 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                     linkedKeys={linkedKeys}
                     onToggleFavorite={(key) => void toggleFavorite(key)}
                     onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
+                    onQuickDispatch={(entity) => void quickDispatch(entity)}
+                    onQuickStatus={(entity) => quickStatus(entity)}
                   />
                 ))}
               </ScrollView>
@@ -521,6 +546,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
           theme={theme}
           kind={commentTarget.kind}
           id={commentTarget.id}
+          workspaceId={commentTarget.workspaceId}
           onDone={handleWriteDone}
         />
       ) : null}
@@ -531,7 +557,8 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
           theme={theme}
           kind={statusTarget.kind}
           id={statusTarget.id}
-          current={statusTarget.status}
+          workspaceId={statusTarget.workspaceId}
+          current={statusTarget.current}
           onDone={handleWriteDone}
         />
       ) : null}

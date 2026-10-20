@@ -126,7 +126,7 @@ export function createHandlers(getValues: GetValues) {
       const { config } = await requireConfig();
       const status = input.status.trim();
       if (!status) throw new Error("状态不能为空");
-      await updateEntityStatus(config, input.kind, input.id, status);
+      await updateEntityStatus(config, input.workspaceId ?? "", input.kind, input.id, status);
       return { ok: true };
     },
 
@@ -135,7 +135,7 @@ export function createHandlers(getValues: GetValues) {
       const text = input.text.trim();
       if (!text) throw new Error("评论内容不能为空");
       const me = await fetchMe(config).catch(() => null);
-      await addComment(config, input.kind, input.id, text, me?.nick ?? "");
+      await addComment(config, input.workspaceId ?? "", input.kind, input.id, text, me?.nick ?? "");
       return { ok: true };
     },
 

@@ -1,7 +1,7 @@
 import type { RpcOutput } from "@getpaseo/plugin";
 import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
+import { FlatList, Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { boardRpc } from "../../shared/contracts";
 import { Chip, formatTime, type WorkbenchTheme } from "./bits";
 import { statusTone, toneColor } from "./status-tones";
@@ -19,8 +19,15 @@ function sortPinnedFirst(items: readonly BoardEntityItem[], favorites: readonly 
   return [...items].sort((a, b) => Number(isPinned(b)) - Number(isPinned(a)));
 }
 
+interface CardActions {
+  onToggleFavorite: (key: string) => void;
+  onOpen: (entity: BoardEntityItem) => void;
+  onQuickDispatch?: (entity: BoardEntityItem) => void;
+  onQuickStatus?: (entity: BoardEntityItem) => void;
+}
+
 /** 看板状态列：一列 = 一个状态 */
-export function StatusColumn({ kind, status, label, items, theme, width, favorites, linkedKeys, onToggleFavorite, onOpen }: {
+export function StatusColumn({ kind, status, label, items, theme, width, favorites, linkedKeys, onToggleFavorite, onOpen, onQuickDispatch, onQuickStatus }: {
   kind: BoardEntityItem["kind"];
   status: string;
   label: string;
@@ -31,6 +38,8 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
   linkedKeys: readonly string[];
   onToggleFavorite: (key: string) => void;
   onOpen: (entity: BoardEntityItem) => void;
+  onQuickDispatch?: (entity: BoardEntityItem) => void;
+  onQuickStatus?: (entity: BoardEntityItem) => void;
 }) {
   const ordered = useMemo(() => sortPinnedFirst(items, favorites), [items, favorites]);
 
@@ -67,36 +76,44 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
       {ordered.length === 0 ? (
         <Text style={styles.empty}>没有条目</Text>
       ) : (
-        <ScrollView style={{ flex: 1, minHeight: 0 }} contentContainerStyle={styles.list}>
-          {ordered.map((item) => {
-            const key = entityKey(item);
-            return (
-              <EntityCard
-                key={key}
-                entity={item}
-                theme={theme}
-                pinned={favorites.includes(key)}
-                linked={linkedKeys.includes(key)}
-                onTogglePinned={() => onToggleFavorite(key)}
-                onPress={() => onOpen(item)}
-              />
-            );
-          })}
-        </ScrollView>
+        <FlatList
+          style={{ flex: 1, minHeight: 0 }}
+          contentContainerStyle={styles.list}
+          data={ordered}
+          keyExtractor={entityKey}
+          initialNumToRender={12}
+          maxToRenderPerBatch={16}
+          windowSize={7}
+          removeClippedSubviews
+          renderItem={({ item }) => (
+            <EntityCard
+              entity={item}
+              theme={theme}
+              pinned={favorites.includes(entityKey(item))}
+              linked={linkedKeys.includes(entityKey(item))}
+              onTogglePinned={() => onToggleFavorite(entityKey(item))}
+              onPress={() => onOpen(item)}
+              onQuickDispatch={onQuickDispatch ? () => onQuickDispatch(item) : undefined}
+              onQuickStatus={onQuickStatus ? () => onQuickStatus(item) : undefined}
+            />
+          )}
+        />
       )}
     </View>
   );
 }
 
-function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: {
+function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress, onQuickDispatch, onQuickStatus }: {
   entity: BoardEntityItem;
   theme: WorkbenchTheme;
   pinned: boolean;
   linked: boolean;
   onTogglePinned: () => void;
   onPress: () => void;
+  onQuickDispatch?: () => void;
+  onQuickStatus?: () => void;
 }) {
-  const styles = useMemo<{ card: ViewStyle; titleRow: ViewStyle; title: TextStyle; meta: ViewStyle; sub: TextStyle }>(() => ({
+  const styles = useMemo<{ card: ViewStyle; titleRow: ViewStyle; title: TextStyle; meta: ViewStyle; sub: TextStyle; storyChip: TextStyle }>(() => ({
     card: {
       backgroundColor: theme.colors.surface1,
       borderColor: theme.colors.border,
@@ -106,15 +123,26 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
       gap: 6,
       opacity: entity.done ? 0.7 : 1,
     },
-    titleRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+    titleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     title: { color: theme.colors.foreground, fontSize: 13, lineHeight: 18, flex: 1 },
     meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
     sub: { color: theme.colors.foregroundMuted, fontSize: 11 },
+    storyChip: { color: theme.colors.foregroundMuted, fontSize: 10 },
   }), [theme, entity.done]);
 
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.card}>
       <View style={styles.titleRow}>
+        {onQuickDispatch ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={`派给 Agent · ${entity.title}`} hitSlop={6} onPress={onQuickDispatch}>
+            <Icon name="Bot" size={14} color={theme.colors.foregroundMuted} />
+          </Pressable>
+        ) : null}
+        {onQuickStatus ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={`改状态 · ${entity.title}`} hitSlop={6} onPress={onQuickStatus}>
+            <Icon name="CircleDot" size={14} color={theme.colors.foregroundMuted} />
+          </Pressable>
+        ) : null}
         <Text style={styles.title} numberOfLines={2}>
           {entity.title}
         </Text>
@@ -126,6 +154,9 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
         {linked ? <Chip label="已关联" theme={theme} color={theme.colors.accent} /> : null}
         {entity.priority ? <Chip label={entity.priority} theme={theme} /> : null}
         {entity.iterationName ? <Chip label={entity.iterationName} theme={theme} /> : null}
+        {entity.kind !== "story" && entity.storyTitle ? (
+          <Chip label={`需求：${entity.storyTitle}`} theme={theme} tone="muted" />
+        ) : null}
       </View>
       <Text style={styles.sub} numberOfLines={1}>
         #{entity.id} · {formatTime(entity.modified)}
@@ -135,8 +166,14 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
   );
 }
 
-/** 类型列（聚合 tab）：一列 = 一个单据类型；支持按状态分组折叠 */
-export function KindColumn({ kind, label, items, total, truncated, theme, flex, width, emptyText, grouped, favorites, linkedKeys, onToggleFavorite, onOpen }: {
+/** 类型列（聚合 tab）：一列 = 一个单据类型；支持按状态分组折叠（FlatList 窗口化渲染） */
+type GroupInfo = { status: string; label: string; done: boolean; count: number };
+
+type ListEntry =
+  | { type: "header"; entryKey: string; group: GroupInfo }
+  | { type: "card"; entryKey: string; item: BoardEntityItem };
+
+export function KindColumn({ kind, label, items, total, truncated, theme, flex, width, emptyText, grouped, favorites, linkedKeys, onToggleFavorite, onOpen, onQuickDispatch, onQuickStatus }: {
   kind: BoardEntityItem["kind"];
   label: string;
   items: BoardEntityItem[];
@@ -151,6 +188,8 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
   linkedKeys: readonly string[];
   onToggleFavorite: (key: string) => void;
   onOpen: (entity: BoardEntityItem) => void;
+  onQuickDispatch?: (entity: BoardEntityItem) => void;
+  onQuickStatus?: (entity: BoardEntityItem) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -176,22 +215,27 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
     setCollapsed((current) => ({ ...current, [status]: !current[status] }));
   }
 
-  function renderCard(item: BoardEntityItem) {
-    const key = entityKey(item);
-    return (
-      <EntityCard
-        key={key}
-        entity={item}
-        theme={theme}
-        pinned={favorites.includes(key)}
-        linked={linkedKeys.includes(key)}
-        onTogglePinned={() => onToggleFavorite(key)}
-        onPress={() => onOpen(item)}
-      />
-    );
-  }
+  const entries = useMemo<ListEntry[]>(() => {
+    if (grouped && groups) {
+      const rows: ListEntry[] = [];
+      for (const group of groups) {
+        rows.push({
+          type: "header",
+          entryKey: `header-${group.status}`,
+          group: { status: group.status, label: group.label, done: group.done, count: group.items.length },
+        });
+        if (!collapsed[group.status]) {
+          for (const item of group.items) {
+            rows.push({ type: "card", entryKey: entityKey(item), item });
+          }
+        }
+      }
+      return rows;
+    }
+    return ordered.map((item) => ({ type: "card", entryKey: entityKey(item), item }));
+  }, [grouped, groups, collapsed, ordered]);
 
-  const styles = useMemo<{ column: ViewStyle; header: ViewStyle; title: TextStyle; count: TextStyle; list: ViewStyle; empty: TextStyle; group: ViewStyle; groupHeader: ViewStyle; groupCount: TextStyle }>(() => ({
+  const styles = useMemo<{ column: ViewStyle; header: ViewStyle; title: TextStyle; count: TextStyle; list: ViewStyle; empty: TextStyle; groupHeader: ViewStyle; groupCount: TextStyle }>(() => ({
     column: {
       flex: flex ? 1 : undefined,
       width: flex ? undefined : width,
@@ -208,7 +252,6 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
     count: { color: theme.colors.foregroundMuted, fontSize: 12 },
     list: { gap: 8, paddingBottom: 4 },
     empty: { color: theme.colors.foregroundMuted, fontSize: 12, paddingHorizontal: 2, paddingVertical: 6 },
-    group: { gap: 6 },
     groupHeader: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 2, paddingHorizontal: 2 },
     groupCount: { color: theme.colors.foregroundMuted, fontSize: 11 },
   }), [theme, flex, width]);
@@ -224,33 +267,49 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
       {ordered.length === 0 ? (
         <Text style={styles.empty}>{emptyText}</Text>
       ) : (
-        <ScrollView style={{ flex: 1, minHeight: 0 }} contentContainerStyle={styles.list}>
-          {grouped && groups ? (
-            <>
-              {groups.map((group) => (
-                <View key={group.status} style={styles.group}>
-                  <Pressable accessibilityRole="button" style={styles.groupHeader} onPress={() => toggleGroup(group.status)}>
-                    <Icon
-                      name={collapsed[group.status] ? "ChevronRight" : "ChevronDown"}
-                      size={14}
-                      color={theme.colors.foregroundMuted}
-                    />
-                    <Chip
-                      label={group.label}
-                      theme={theme}
-                      tone={statusTone(kind, group.status) === "neutral" ? "muted" : "plain"}
-                      color={toneColor(statusTone(kind, group.status), theme)}
-                    />
-                    <Text style={styles.groupCount}>{group.items.length}</Text>
-                  </Pressable>
-                  {collapsed[group.status] ? null : group.items.map((item) => renderCard(item))}
-                </View>
-              ))}
-            </>
-          ) : (
-            <>{ordered.map((item) => renderCard(item))}</>
-          )}
-        </ScrollView>
+        <FlatList
+          style={{ flex: 1, minHeight: 0 }}
+          contentContainerStyle={styles.list}
+          data={entries}
+          keyExtractor={(entry) => entry.entryKey}
+          initialNumToRender={12}
+          maxToRenderPerBatch={16}
+          windowSize={7}
+          removeClippedSubviews
+          renderItem={({ item: entry }) => {
+            if (entry.type === "header") {
+              const tone = statusTone(kind, entry.group.status);
+              return (
+                <Pressable accessibilityRole="button" style={styles.groupHeader} onPress={() => toggleGroup(entry.group.status)}>
+                  <Icon
+                    name={collapsed[entry.group.status] ? "ChevronRight" : "ChevronDown"}
+                    size={14}
+                    color={theme.colors.foregroundMuted}
+                  />
+                  <Chip
+                    label={entry.group.label}
+                    theme={theme}
+                    tone={tone === "neutral" ? "muted" : "plain"}
+                    color={toneColor(tone, theme)}
+                  />
+                  <Text style={styles.groupCount}>{entry.group.count}</Text>
+                </Pressable>
+              );
+            }
+            return (
+              <EntityCard
+                entity={entry.item}
+                theme={theme}
+                pinned={favorites.includes(entry.entryKey)}
+                linked={linkedKeys.includes(entry.entryKey)}
+                onTogglePinned={() => onToggleFavorite(entry.entryKey)}
+                onPress={() => onOpen(entry.item)}
+                onQuickDispatch={onQuickDispatch ? () => onQuickDispatch(entry.item) : undefined}
+                onQuickStatus={onQuickStatus ? () => onQuickStatus(entry.item) : undefined}
+              />
+            );
+          }}
+        />
       )}
     </View>
   );
