@@ -1,7 +1,7 @@
 import type { RpcOutput } from "@getpaseo/plugin";
 import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
+import { ScrollView, Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { boardRpc } from "../../shared/contracts";
 import { Chip, HoverTip, formatTime, type WorkbenchTheme } from "./bits";
 import { statusTone, toneColor } from "./status-tones";
@@ -72,17 +72,10 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
       {ordered.length === 0 ? (
         <Text style={styles.empty}>没有条目</Text>
       ) : (
-        <FlatList
-          style={{ flex: 1, minHeight: 0 }}
-          contentContainerStyle={styles.list}
-          data={ordered}
-          keyExtractor={entityKey}
-          initialNumToRender={12}
-          maxToRenderPerBatch={16}
-          windowSize={7}
-          removeClippedSubviews
-          renderItem={({ item }) => (
+        <ScrollView style={{ flex: 1, minHeight: 0 }} contentContainerStyle={styles.list}>
+          {ordered.map((item) => (
             <EntityCard
+              key={entityKey(item)}
               entity={item}
               theme={theme}
               pinned={favorites.includes(entityKey(item))}
@@ -90,8 +83,8 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
               onTogglePinned={() => onToggleFavorite(entityKey(item))}
               onPress={() => onOpen(item)}
             />
-          )}
-        />
+          ))}
+        </ScrollView>
       )}
     </View>
   );
@@ -262,20 +255,12 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
       {ordered.length === 0 ? (
         <Text style={styles.empty}>{emptyText}</Text>
       ) : (
-        <FlatList
-          style={{ flex: 1, minHeight: 0 }}
-          contentContainerStyle={styles.list}
-          data={entries}
-          keyExtractor={(entry) => entry.entryKey}
-          initialNumToRender={12}
-          maxToRenderPerBatch={16}
-          windowSize={7}
-          removeClippedSubviews
-          renderItem={({ item: entry }) => {
+        <ScrollView style={{ flex: 1, minHeight: 0 }} contentContainerStyle={styles.list}>
+          {entries.map((entry) => {
             if (entry.type === "header") {
               const tone = statusTone(kind, entry.group.status);
               return (
-                <Pressable accessibilityRole="button" style={styles.groupHeader} onPress={() => toggleGroup(entry.group.status)}>
+                <Pressable key={entry.entryKey} accessibilityRole="button" style={styles.groupHeader} onPress={() => toggleGroup(entry.group.status)}>
                   <Icon
                     name={collapsed[entry.group.status] ? "ChevronRight" : "ChevronDown"}
                     size={14}
@@ -293,6 +278,7 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
             }
             return (
               <EntityCard
+                key={entry.entryKey}
                 entity={entry.item}
                 theme={theme}
                 pinned={favorites.includes(entry.entryKey)}
@@ -301,8 +287,8 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
                 onPress={() => onOpen(entry.item)}
               />
             );
-          }}
-        />
+          })}
+        </ScrollView>
       )}
     </View>
   );
