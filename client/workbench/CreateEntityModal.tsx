@@ -5,16 +5,16 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { createFieldsRpc, createRpc, filterOptionsRpc, type EntityKind } from "../../shared/contracts";
 import { Chip, type WorkbenchTheme } from "./bits";
+import { DatePicker } from "./DatePicker";
+
+/** 宽松校验 YYYY-MM-DD（日历行展示用） */
+function parseKey(key: string): string | null {
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
+}
 
 const KIND_TITLES: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
 
-/** 本地时区 YYYY-MM-DD，days=0 今天、1 明天 */
-function localDate(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
+type ModalMode = { name: "form" } | { name: "iteration" } | { name: "date"; fieldKey: string };
 
 export interface CreatedEntity {
   id: string;
@@ -59,7 +59,7 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
   const [priority, setPriority] = useState("");
   const [iterationId, setIterationId] = useState("");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
-  const [mode, setMode] = useState<"form" | "iteration">("form");
+  const [mode, setMode] = useState<ModalMode>({ name: "form" });
   const [submitting, setSubmitting] = useState(false);
   const fieldsQuery = useQuery({
     queryKey: ["tapd-create-fields", kind, initial?.workspaceId ?? ""],
@@ -79,7 +79,7 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
       setPriority("");
       setIterationId("");
       setExtraValues({});
-      setMode("form");
+      setMode({ name: "form" });
       setSubmitting(false);
     } else if (initial) {
       setKind(initial.kind);
@@ -175,13 +175,39 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
     optionText: { color: theme.colors.foreground, fontSize: 13, flex: 1 },
   }), [theme]);
 
-  if (mode === "iteration") {
+  if (mode.name === "date") {
+    const dateField = fieldsQuery.data?.fields.find((field) => field.key === mode.fieldKey);
+    if (dateField) {
+      return (
+        <Modal title={`新建单据 · 选择${dateField.label}`} open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+          <Modal.Content scrollable={false} contentContainerStyle={{ padding: 0, gap: 0 }}>
+            <View style={{ flex: 1, minHeight: 0, gap: 10, padding: 14 }}>
+              <Pressable accessibilityRole="button" style={styles.backRow} onPress={() => setMode({ name: "form" })}>
+                <Icon name="ChevronLeft" size={16} color={theme.colors.accent} />
+                <Text style={styles.link}>返回</Text>
+              </Pressable>
+              <DatePicker
+                theme={theme}
+                value={extraValues[dateField.key] ?? ""}
+                onChange={(next) => {
+                  setExtraValues((prev) => ({ ...prev, [dateField.key]: next }));
+                  if (next) setMode({ name: "form" });
+                }}
+              />
+            </View>
+          </Modal.Content>
+        </Modal>
+      );
+    }
+  }
+
+  if (mode.name === "iteration") {
     const rows = [{ id: "", name: "全部迭代", status: "" }, ...iterations];
     return (
       <Modal title="新建单据 · 选择迭代" open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
         <Modal.Content scrollable={false} contentContainerStyle={{ padding: 0, gap: 0 }}>
           <View style={{ flex: 1, minHeight: 0, paddingTop: 8, paddingHorizontal: 14 }}>
-            <Pressable accessibilityRole="button" style={styles.backRow} onPress={() => setMode("form")}>
+            <Pressable accessibilityRole="button" style={styles.backRow} onPress={() => setMode({ name: "form" })}>
               <Icon name="ChevronLeft" size={16} color={theme.colors.accent} />
               <Text style={styles.link}>返回</Text>
             </Pressable>
@@ -195,7 +221,7 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
                   style={styles.optionRow}
                   onPress={() => {
                     setIterationId(item.id);
-                    setMode("form");
+                    setMode({ name: "form" });
                   }}
                 >
                   <Text style={styles.optionText} numberOfLines={1}>
@@ -293,7 +319,7 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
               </View>
             </View>
           ) : null}
-          <Pressable accessibilityRole="button" style={styles.optionRow} onPress={() => setMode("iteration")}>
+          <Pressable accessibilityRole="button" style={styles.optionRow} onPress={() => setMode({ name: "iteration" })}>
             <Text style={[styles.optionText, { flex: undefined, width: 64, color: theme.colors.foregroundMuted, fontSize: 13 }]}>迭代</Text>
             <Text style={styles.optionText} numberOfLines={1}>{iterationLabel}</Text>
             <Icon name="ChevronRight" size={15} color={theme.colors.foregroundMuted} />
@@ -363,24 +389,34 @@ export function CreateEntityModal({ open, onClose, theme, onCreated, initial }: 
                     </View>
                   );
                 }
+                if (field.inputKind === "date") {
+                  const dateValue = value ? parseKey(value) : null;
+                  return (
+                    <Pressable
+                      key={field.key}
+                      accessibilityRole="button"
+                      accessibilityLabel={`选择${field.label}`}
+                      style={styles.optionRow}
+                      onPress={() => setMode({ name: "date", fieldKey: field.key })}
+                    >
+                      <Text style={[styles.optionText, { flex: undefined, width: 96, color: theme.colors.foregroundMuted, fontSize: 13 }]} numberOfLines={1}>
+                        {label}
+                      </Text>
+                      <Text style={styles.optionText} numberOfLines={1}>{dateValue ? value : "未选择"}</Text>
+                      <Icon name="ChevronRight" size={15} color={theme.colors.foregroundMuted} />
+                    </Pressable>
+                  );
+                }
                 return (
                   <View key={field.key} style={styles.row}>
                     <Text style={styles.rowLabel} numberOfLines={1}>{label}</Text>
-                    <View style={{ ...styles.chips, rowGap: 6 }}>
-                      {field.inputKind === "date" ? (
-                        <>
-                          <Chip label="今天" theme={theme} active={value === localDate(0)} onPress={() => setValue(localDate(0))} />
-                          <Chip label="明天" theme={theme} active={value === localDate(1)} onPress={() => setValue(localDate(1))} />
-                        </>
-                      ) : null}
-                      <TextInput
-                        style={styles.input}
-                        placeholder={field.inputKind === "date" ? "如 YYYY-MM-DD" : "可选"}
-                        placeholderTextColor={theme.colors.foregroundMuted}
-                        value={value}
-                        onChangeText={setValue}
-                      />
-                    </View>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="可选"
+                      placeholderTextColor={theme.colors.foregroundMuted}
+                      value={value}
+                      onChangeText={setValue}
+                    />
                   </View>
                 );
               })
