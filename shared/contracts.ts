@@ -315,6 +315,10 @@ export const createRpc = defineRpc({
     owner: z.string().default(""),
     priority: z.string().default(""),
     iterationId: z.string().default(""),
+    /** 挂载的需求 ID（仅 task/bug；留空不挂载） */
+    storyId: z.string().default(""),
+    /** 单据所在项目，缺省用 daemon 配置的第一个项目 */
+    workspaceId: z.string().default(""),
   }),
   output: z.object({
     id: z.string(),
