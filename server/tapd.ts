@@ -830,13 +830,17 @@ export interface CreateEntityInput {
   owner: string;
   priority: string;
   iterationId: string;
+  /** 挂载的所属需求 ID（仅 task/bug 生效） */
+  storyId?: string;
+  /** 单据所在项目；缺省仍取 workspaceIds[0] */
+  workspaceId?: string;
 }
 
 export async function createEntity(
   config: TapdConfig,
   input: CreateEntityInput,
 ): Promise<{ id: string; kind: EntityKind; url: string }> {
-  const workspaceId = config.workspaceIds[0] ?? "";
+  const workspaceId = (input.workspaceId ?? "").trim() || config.workspaceIds[0] || "";
   const params: Record<string, QueryValue> = { workspace_id: workspaceId };
   if (input.kind === "bug") params.title = input.title;
   else params.name = input.title;
@@ -848,6 +852,9 @@ export async function createEntity(
   }
   if (input.priority.trim()) params.priority_label = input.priority.trim();
   if (input.iterationId.trim()) params.iteration_id = input.iterationId.trim();
+  if (input.kind !== "story" && (input.storyId ?? "").trim()) {
+    params.story_id = (input.storyId ?? "").trim();
+  }
   const data = await requestPost(config, LIST_PATH[input.kind], params);
   const row = unwrapRow(data, [KIND_WRAPPER[input.kind]]);
   const id = String(row?.id ?? "");
