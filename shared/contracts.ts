@@ -319,11 +319,35 @@ export const createRpc = defineRpc({
     storyId: z.string().default(""),
     /** 单据所在项目，缺省用 daemon 配置的第一个项目 */
     workspaceId: z.string().default(""),
+    /** 动态表单收集的其余可写字段（服务端做 denylist 过滤） */
+    extraFields: z.record(z.string(), z.string()).default({}),
   }),
   output: z.object({
     id: z.string(),
     kind: entityKindSchema,
     url: z.string(),
+  }),
+});
+
+/** 挂载创建用的动态字段表：该类型 fields_info 中可写字段 + 当前登录用户 */
+export const createFieldsRpc = defineRpc({
+  name: "tapd.createFields",
+  input: z.object({
+    kind: entityKindSchema,
+    workspaceId: z.string().default(""),
+  }),
+  output: z.object({
+    me: z.string().default(""),
+    fields: z.array(
+      z.object({
+        key: z.string(),
+        label: z.string(),
+        inputKind: z.enum(["text", "textarea", "enum", "user", "date"]),
+        single: z.boolean(),
+        options: z.array(z.object({ value: z.string(), label: z.string() })).default([]),
+        required: z.boolean().default(false),
+      }),
+    ),
   }),
 });
 

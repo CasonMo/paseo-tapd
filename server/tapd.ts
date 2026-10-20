@@ -834,6 +834,81 @@ export interface CreateEntityInput {
   storyId?: string;
   /** 单据所在项目；缺省仍取 workspaceIds[0] */
   workspaceId?: string;
+  /** 动态表单收集的其余可写字段（key 会经 denylist 过滤） */
+  extraFields?: Record<string, string>;
+}
+
+/** 创建接口额外透传字段时禁止的系统列/受控列（含动态表单里已静态化的列） */
+const CREATE_FIELD_DENYLIST = new Set([
+  "id", "workspace_id", "story_id", "parent_id", "name", "title", "description",
+  "owner", "current_owner", "priority_label", "iteration_id", "status",
+  "created", "modified", "creator", "reporter", "cc", "follower",
+]);
+
+export interface CreateFieldInfo {
+  key: string;
+  label: string;
+  inputKind: "text" | "textarea" | "enum" | "user" | "date";
+  single: boolean;
+  options: { value: string; label: string }[];
+  required: boolean;
+}
+
+/** 挂载创建的动态字段表：单类型 fields_info 中可写、非系统列的字段，附当前登录用户昵称 */
+export async function fetchCreateFields(
+  config: TapdConfig,
+  kind: EntityKind,
+  workspaceId?: string,
+): Promise<{ me: string; fields: CreateFieldInfo[] }> {
+  const ws = (workspaceId ?? "").trim() || config.workspaceIds[0] || "";
+  let data: unknown;
+  try {
+    data = await requestJson(config, FIELDS_INFO_PATH[kind], { workspace_id: ws }, 30 * 60_000);
+  } catch {
+    return { me: "", fields: [] };
+  }
+  const me = await fetchMe(config).then((value) => value?.nick ?? "").catch(() => "");
+  const fields: CreateFieldInfo[] = [];
+  if (!data || typeof data !== "object") return { me, fields };
+  for (const [key, raw] of Object.entries(data as Record<string, unknown>)) {
+    const info = raw as Record<string, unknown>;
+    if (!info || typeof info !== "object") continue;
+    if (CREATE_FIELD_DENYLIST.has(key)) continue;
+    const readonlyFlag = info.readonly;
+    if (readonlyFlag === 1 || readonlyFlag === "1" || readonlyFlag === true) continue;
+    const htmlType = String(info.html_type ?? "");
+    const mapped = mapHtmlType(htmlType);
+    if (!mapped) continue;
+    const label = String(info.label ?? "").trim();
+    if (!label) continue;
+    const options: { value: string; label: string }[] = [];
+    const optionsRaw = info.options;
+    if (optionsRaw && typeof optionsRaw === "object" && !Array.isArray(optionsRaw)) {
+      for (const [value, optionLabel] of Object.entries(optionsRaw as Record<string, unknown>)) {
+        options.push({ value, label: typeof optionLabel === "string" ? optionLabel : value });
+      }
+    }
+    const inputKind: CreateFieldInfo["inputKind"] =
+      htmlType.includes("rich_edit") || htmlType.includes("textarea")
+        ? "textarea"
+        : mapped.kind === "enum"
+          ? "enum"
+          : mapped.kind === "user"
+            ? "user"
+            : mapped.kind === "date"
+              ? "date"
+              : "text";
+    fields.push({
+      key,
+      label,
+      inputKind,
+      single: mapped.single,
+      options: inputKind === "enum" || inputKind === "user" ? options : [],
+      required: info.required === 1 || info.required === "1" || info.required === true,
+    });
+  }
+  fields.sort((a, b) => Number(b.required) - Number(a.required) || a.label.localeCompare(b.label, "zh-Hans-CN"));
+  return { me, fields };
 }
 
 export async function createEntity(
@@ -854,6 +929,13 @@ export async function createEntity(
   if (input.iterationId.trim()) params.iteration_id = input.iterationId.trim();
   if (input.kind !== "story" && (input.storyId ?? "").trim()) {
     params.story_id = (input.storyId ?? "").trim();
+  }
+  for (const [rawKey, rawValue] of Object.entries(input.extraFields ?? {})) {
+    const key = rawKey.trim();
+    // 系统列/静态行专用字段一律拒绝，story_id/workspace_id 由挂载上下文决定，防动态注入
+    if (!key || key === "story_id" || key === "workspace_id" || CREATE_FIELD_DENYLIST.has(key)) continue;
+    const value = (rawValue ?? "").trim();
+    if (value) params[key] = value;
   }
   const data = await requestPost(config, LIST_PATH[input.kind], params);
   const row = unwrapRow(data, [KIND_WRAPPER[input.kind]]);

@@ -1,6 +1,6 @@
 import type { PluginHandlerContext } from "@getpaseo/plugin/server";
 import type { RpcInput, RpcOutput } from "@getpaseo/plugin";
-import type { addCommentRpc, agentStatusRpc, boardRpc, checkRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, updateCheckRpc, updateStatusRpc } from "../shared/contracts";
+import type { addCommentRpc, agentStatusRpc, boardRpc, checkRpc, createFieldsRpc, createRpc, entityRpc, filterFieldsRpc, filterOptionsRpc, searchRpc, updateCheckRpc, updateStatusRpc } from "../shared/contracts";
 import { DEFAULT_FILTERS, type EntityKind, type TapdSettingsValues } from "../shared/contracts";
 import { getTurnRecord, type AgentTurnRecord } from "./agent-state";
 import {
@@ -14,6 +14,7 @@ import {
   fetchFilterOptions,
   fetchMe,
   fetchMyCommentedIds,
+  fetchCreateFields,
   fetchRelatedStoryIdsFromTasks,
   isoDateDaysAgo,
   resolveConfig,
@@ -125,7 +126,15 @@ export function createHandlers(getValues: GetValues) {
         owner: input.owner,
         priority: input.priority,
         iterationId: input.iterationId,
+        storyId: input.storyId,
+        workspaceId: input.workspaceId,
+        extraFields: input.extraFields,
       });
+    },
+
+    async createFields(input: RpcInput<typeof createFieldsRpc>): Promise<RpcOutput<typeof createFieldsRpc>> {
+      const { config } = await requireConfig();
+      return fetchCreateFields(config, input.kind, input.workspaceId);
     },
 
     async updateStatus(input: RpcInput<typeof updateStatusRpc>): Promise<RpcOutput<typeof updateStatusRpc>> {
