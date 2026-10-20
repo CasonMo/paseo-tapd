@@ -48,7 +48,7 @@ Pick an agent from the item detail window to link the item to that conversation.
 - Reads cover every configured project. Write operations (comments, status changes, item creation) target the item's actual project when known, falling back to the first configured TAPD project.
 - Agent dispatch sends the item snapshot (used as the prompt) to the selected agent provider through the Paseo SDK.
 - Update checks fetch the public registry record and this repository's manifest at the pinned commit from GitHub (`raw.githubusercontent.com`, falling back to `api.github.com`). No credentials are attached and no user data is sent; the result is cached for an hour.
-- Settings sync contacts exactly one extra destination: the Git remote the user configured in settings (HTTPS URL + access token, or an SSH URL). Push/pull only happen on the explicit buttons in settings; the synced payload is the sanitized settings JSON (`tapd-workbench-settings.json`, no TAPD token, no Git token) written by the daemon to a temporary clone that is deleted after each operation. Errors never echo the token; the Git credentials are not stored anywhere beyond the plugin's own settings.
+- Settings sync contacts exactly one extra destination: the Git remote the user configured in settings (HTTPS URL + access token, or an SSH URL). Push/pull only happen on the explicit buttons in settings; the synced payload is the sanitized settings JSON (`tapd-workbench-settings.json`, no TAPD token, no Git token) written by the daemon to a temporary clone that is deleted after each operation. In HTTPS mode the Git token is transmitted to the configured Git host during clone/push and is stored in the temporary clone's `.git/config` until the clone is deleted; error text never echoes the token, and pulling cannot replace the locally configured sync destination (URL/branch) or import secret fields.
 
 ## Development
 
@@ -123,7 +123,7 @@ paseo plugin add git:<repo-url>
 - 派给 Agent 时，单据快照（作为提示词）经 Paseo SDK 发送给所选的 agent provider。
 - Agent 状态与结果摘要通过插件自身的 daemon RPC 读取，不新增外部网络目的地；自动回评使用与手动评论相同的 TAPD OpenAPI 评论通道。
 - 更新检查从 GitHub 拉取公开的 registry 记录与固定提交处的本仓库清单（`raw.githubusercontent.com`，失败时回退 `api.github.com`），不附带凭据、不发送用户数据，结果缓存一小时。
-- 配置同步只新增一个网络目的地：用户在设置里填写的 Git 仓库（HTTPS 地址 + 访问令牌，或 SSH 地址）。推送/拉取只由设置页的按钮触发；上传/下载内容为脱敏后的设置 JSON（`tapd-workbench-settings.json`，不含 TAPD Token 与 Git 令牌），daemon 侧在临时目录克隆、用完即删；报错信息不回显令牌，Git 凭据不会落到克隆目录。
+- 配置同步只新增一个网络目的地：用户在设置里填写的 Git 仓库（HTTPS 地址 + 访问令牌，或 SSH 地址）。推送/拉取只由设置页的按钮触发；上传/下载内容为脱敏后的设置 JSON（`tapd-workbench-settings.json`，不含 TAPD Token 与 Git 令牌），daemon 侧在临时目录克隆、用完即删。HTTPS 模式下 Git 令牌在克隆/推送时会发送到仓库服务器，并暂存于临时克隆目录的 `.git/config` 中（目录删除即清除）；报错信息不回显令牌，拉取不会改变本机同步目的地（地址/分支），也不会导入任何密钥字段。
 
 ## 开发
 

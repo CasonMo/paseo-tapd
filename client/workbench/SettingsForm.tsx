@@ -232,7 +232,7 @@ function SyncSettingsSection({ settings, theme }: { settings: ReadySettings; the
         />
         <SettingsInput
           label="Git 访问令牌"
-          hint="不会写入同步文件，也不会注入 Agent 会话；只在本地提交时使用"
+          hint="HTTPS 模式下会随推送/拉取发送到仓库服务器，并暂存于临时克隆目录（用完即删）；不写入同步文件、不注入 Agent 会话，报错不回显"
           placeholder="GitHub/GitLab access token"
           secureTextEntry
           initialValue={settings.values.syncGitToken}

@@ -80,8 +80,11 @@ async function cleanup(dir: string): Promise<void> {
   await rm(dir, { recursive: true, force: true });
 }
 
-/** 每次操作都临时浅克隆一份，用完即删，本地不落任何仓库状态、不存令牌。返回目录与是否为空仓库 */
-// ponytail: 令牌会短暂出现在本机进程参数里（仅限 daemon 主机）——如需彻底隐藏改用 git credential helper
+/** 拉取时额外排除的同步配置字段：仓库备份不得改变本机的同步目的地 */
+const PULL_EXCLUDED_KEYS = ["syncGitUrl", "syncBranch"] as const;
+
+/** 每次操作都临时浅克隆一份，用完即删；HTTPS 模式下令牌会进入克隆 URL（暂存于克隆目录的 .git/config，目录删除即清除） */
+// ponytail: 令牌会短暂出现在本机进程参数与临时 .git/config 里（仅限 daemon 主机）——如需彻底隐藏改用 git credential helper
 async function withClone<T>(values: TapdSettingsValues, fn: (dir: string, empty: boolean) => Promise<T>): Promise<T> {
   const { url, token, branch: targetBranch } = validateTarget(values);
   const dir = join(tmpdir(), `tapd-workbench-sync-${randomUUID()}`);
@@ -140,8 +143,10 @@ export async function pullSettings(access: SyncSettingsAccess): Promise<{ messag
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       throw new Error(`仓库中的 ${FILE_NAME} 不是合法的设置对象`);
     }
-    // 仓库文件可被手改：同样脱敏，防止 token/workspaceIds 等隐私字段经拉取覆盖本机
+    // 仓库文件可被手改：同样脱敏，防止 token/workspaceIds 等隐私字段经拉取覆盖本机；
+    // 同步目的地字段（syncGitUrl/syncBranch）一律保留本机现值，避免"用导入的令牌指向导入的地址"
     const managed = managedValues(parsed as TapdSettingsValues);
+    for (const key of PULL_EXCLUDED_KEYS) delete managed[key];
     const counts = [
       `视图 ${Array.isArray(managed.views) ? managed.views.length : 0}`,
       `关联记录 ${Array.isArray(managed.links) ? managed.links.length : 0}`,
