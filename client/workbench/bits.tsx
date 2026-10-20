@@ -5,6 +5,19 @@ import { Pressable, Text, View, type TextStyle, type ViewStyle } from "react-nat
 
 export type WorkbenchTheme = PluginHostProps["theme"];
 
+/** 依据前景色亮度判断当前主题是否为暗色（浮窗底色跟随明暗切换） */
+function themeIsDark(theme: WorkbenchTheme): boolean {
+  const raw = theme.colors.foreground.trim();
+  const hex6 = /^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/.exec(raw);
+  const hex3 = /^#([0-9a-fA-F]{3})$/.exec(raw);
+  const [r, g, b] = hex6
+    ? hex6[1].match(/../g)?.map((h) => parseInt(h, 16)) ?? [0, 0, 0]
+    : hex3
+      ? hex3[1].split("").map((c) => parseInt(c + c, 16))
+      : [0, 0, 0];
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
+}
+
 /**
  * 省略文本（numberOfLines）的悬停全文提示：
  * 桌面端鼠标悬停浮窗展示全文；无 onPress，点击事件继续冒泡给外层按钮。
@@ -24,23 +37,31 @@ export function HoverTip({ tip, theme, children, style, top = 30, tipWidth }: {
 }) {
   const [hovering, setHovering] = useState(false);
   const show = hovering && tip.trim().length > 0;
+  const dark = themeIsDark(theme);
   const styles = useMemo<{ box: ViewStyle; text: TextStyle }>(() => ({
     box: {
       position: "absolute",
       top,
-      left: 0,
+      left: tipWidth == null ? 0 : undefined,
       right: tipWidth == null ? 0 : undefined,
       width: tipWidth,
-      zIndex: 20,
-      backgroundColor: theme.colors.surface2,
+      zIndex: 50,
+      backgroundColor: dark ? "#17181c" : "#ffffff",
       borderColor: theme.colors.border,
       borderWidth: 1,
       borderRadius: 8,
       padding: 10,
+      // 桌面端阴影（react-native-web），提升与卡片底色的区分度
+      shadowColor: "#000",
+      shadowOpacity: 0.35,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 8,
     },
     text: { color: theme.colors.foreground, fontSize: 12, lineHeight: 18 },
-  }), [theme, top, tipWidth]);  return (
-    <View style={style}>
+  }), [theme, top, tipWidth, dark]);
+  return (
+    <View style={[{ zIndex: 40 }, style]}>
       <Pressable onHoverIn={() => setHovering(true)} onHoverOut={() => setHovering(false)}>
         {children}
       </Pressable>

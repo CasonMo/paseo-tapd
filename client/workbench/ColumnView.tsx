@@ -105,6 +105,7 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
   onTogglePinned: () => void;
   onPress: () => void;
 }) {
+  const [cardHover, setCardHover] = useState(false);
   const styles = useMemo<{ card: ViewStyle; titleRow: ViewStyle; title: TextStyle; meta: ViewStyle; subRow: ViewStyle; sub: TextStyle; storyChip: TextStyle }>(() => ({
     card: {
       backgroundColor: theme.colors.surface1,
@@ -124,7 +125,13 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: 
   }), [theme, entity.done]);
 
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.card}>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.card, cardHover ? { zIndex: 30 } : null]}
+      onHoverIn={() => setCardHover(true)}
+      onHoverOut={() => setCardHover(false)}
+    >
       <View style={styles.titleRow}>
         <HoverTip tip={entity.title} theme={theme} style={{ flex: 1 }} top={36}>
           <Text style={styles.title} numberOfLines={2}>
