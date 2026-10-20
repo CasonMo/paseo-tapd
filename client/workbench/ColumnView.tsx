@@ -1,5 +1,5 @@
 import type { RpcOutput } from "@getpaseo/plugin";
-import { Icon } from "@getpaseo/plugin/client/react-native";
+import { Icon, Modal } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { boardRpc } from "../../shared/contracts";
@@ -113,7 +113,8 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress, on
   onQuickDispatch?: () => void;
   onQuickStatus?: () => void;
 }) {
-  const styles = useMemo<{ card: ViewStyle; titleRow: ViewStyle; title: TextStyle; meta: ViewStyle; sub: TextStyle; storyChip: TextStyle }>(() => ({
+  const [menuOpen, setMenuOpen] = useState(false);
+  const styles = useMemo<{ card: ViewStyle; titleRow: ViewStyle; title: TextStyle; meta: ViewStyle; subRow: ViewStyle; sub: TextStyle; storyChip: TextStyle; menuRow: TextStyle; menuText: TextStyle }>(() => ({
     card: {
       backgroundColor: theme.colors.surface1,
       borderColor: theme.colors.border,
@@ -126,23 +127,24 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress, on
     titleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     title: { color: theme.colors.foreground, fontSize: 13, lineHeight: 18, flex: 1 },
     meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6 },
-    sub: { color: theme.colors.foregroundMuted, fontSize: 11 },
+    subRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    sub: { color: theme.colors.foregroundMuted, fontSize: 11, flex: 1 },
     storyChip: { color: theme.colors.foregroundMuted, fontSize: 10 },
+    menuRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 11,
+      paddingHorizontal: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    menuText: { color: theme.colors.foreground, fontSize: 13, flex: 1 },
   }), [theme, entity.done]);
 
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.card}>
       <View style={styles.titleRow}>
-        {onQuickDispatch ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`派给 Agent · ${entity.title}`} hitSlop={6} onPress={onQuickDispatch}>
-            <Icon name="Bot" size={14} color={theme.colors.foregroundMuted} />
-          </Pressable>
-        ) : null}
-        {onQuickStatus ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`改状态 · ${entity.title}`} hitSlop={6} onPress={onQuickStatus}>
-            <Icon name="CircleDot" size={14} color={theme.colors.foregroundMuted} />
-          </Pressable>
-        ) : null}
         <Text style={styles.title} numberOfLines={2}>
           {entity.title}
         </Text>
@@ -158,10 +160,41 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress, on
           <Chip label={`需求：${entity.storyTitle}`} theme={theme} tone="muted" />
         ) : null}
       </View>
-      <Text style={styles.sub} numberOfLines={1}>
-        #{entity.id} · {formatTime(entity.modified)}
-        {entity.owner ? ` · ${entity.owner}` : ""}
-      </Text>
+      <View style={styles.subRow}>
+        <Text style={styles.sub} numberOfLines={1}>
+          #{entity.id} · {formatTime(entity.modified)}
+          {entity.owner ? ` · ${entity.owner}` : ""}
+        </Text>
+        {onQuickDispatch || onQuickStatus ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={`更多操作 · ${entity.title}`} hitSlop={8} onPress={() => setMenuOpen(true)}>
+            <Icon name="MoreHorizontal" size={15} color={theme.colors.foregroundMuted} />
+          </Pressable>
+        ) : null}
+      </View>
+      <Modal title={`单据操作 · #${entity.id}`} open={menuOpen} onOpenChange={(next) => { if (!next) setMenuOpen(false); }}>
+        <Modal.Content>
+          {onQuickDispatch ? (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.menuRow}
+              onPress={() => { setMenuOpen(false); onQuickDispatch(); }}
+            >
+              <Icon name="Bot" size={15} color={theme.colors.foreground} />
+              <Text style={styles.menuText}>派给 Agent</Text>
+            </Pressable>
+          ) : null}
+          {onQuickStatus ? (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.menuRow}
+              onPress={() => { setMenuOpen(false); onQuickStatus(); }}
+            >
+              <Icon name="CircleDot" size={15} color={theme.colors.foreground} />
+              <Text style={styles.menuText}>修改状态</Text>
+            </Pressable>
+          ) : null}
+        </Modal.Content>
+      </Modal>
     </Pressable>
   );
 }
