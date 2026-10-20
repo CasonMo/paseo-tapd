@@ -331,7 +331,7 @@ export const createRpc = defineRpc({
 
 /** 挂载创建用的动态字段表：该类型 fields_info 中可写字段 + 当前登录用户 */
 export const createFieldsRpc = defineRpc({
-  name: "tapd.createFields",
+  name: "tapd.create_fields",
   input: z.object({
     kind: entityKindSchema,
     workspaceId: z.string().default(""),
