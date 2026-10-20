@@ -1,5 +1,5 @@
 import type { RpcOutput } from "@getpaseo/plugin";
-import { Icon, Modal } from "@getpaseo/plugin/client/react-native";
+import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, Text, View, type TextStyle, type ViewStyle } from "react-native";
 import { boardRpc } from "../../shared/contracts";
@@ -22,12 +22,10 @@ function sortPinnedFirst(items: readonly BoardEntityItem[], favorites: readonly 
 interface CardActions {
   onToggleFavorite: (key: string) => void;
   onOpen: (entity: BoardEntityItem) => void;
-  onQuickDispatch?: (entity: BoardEntityItem) => void;
-  onQuickStatus?: (entity: BoardEntityItem) => void;
 }
 
 /** 看板状态列：一列 = 一个状态 */
-export function StatusColumn({ kind, status, label, items, theme, width, favorites, linkedKeys, onToggleFavorite, onOpen, onQuickDispatch, onQuickStatus }: {
+export function StatusColumn({ kind, status, label, items, theme, width, favorites, linkedKeys, onToggleFavorite, onOpen }: {
   kind: BoardEntityItem["kind"];
   status: string;
   label: string;
@@ -38,8 +36,6 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
   linkedKeys: readonly string[];
   onToggleFavorite: (key: string) => void;
   onOpen: (entity: BoardEntityItem) => void;
-  onQuickDispatch?: (entity: BoardEntityItem) => void;
-  onQuickStatus?: (entity: BoardEntityItem) => void;
 }) {
   const ordered = useMemo(() => sortPinnedFirst(items, favorites), [items, favorites]);
 
@@ -93,8 +89,6 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
               linked={linkedKeys.includes(entityKey(item))}
               onTogglePinned={() => onToggleFavorite(entityKey(item))}
               onPress={() => onOpen(item)}
-              onQuickDispatch={onQuickDispatch ? () => onQuickDispatch(item) : undefined}
-              onQuickStatus={onQuickStatus ? () => onQuickStatus(item) : undefined}
             />
           )}
         />
@@ -103,18 +97,15 @@ export function StatusColumn({ kind, status, label, items, theme, width, favorit
   );
 }
 
-function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress, onQuickDispatch, onQuickStatus }: {
+function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress }: {
   entity: BoardEntityItem;
   theme: WorkbenchTheme;
   pinned: boolean;
   linked: boolean;
   onTogglePinned: () => void;
   onPress: () => void;
-  onQuickDispatch?: () => void;
-  onQuickStatus?: () => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const styles = useMemo<{ card: ViewStyle; titleRow: ViewStyle; title: TextStyle; meta: ViewStyle; subRow: ViewStyle; sub: TextStyle; storyChip: TextStyle; menuRow: TextStyle; menuText: TextStyle }>(() => ({
+  const styles = useMemo<{ card: ViewStyle; titleRow: ViewStyle; title: TextStyle; meta: ViewStyle; subRow: ViewStyle; sub: TextStyle; storyChip: TextStyle }>(() => ({
     card: {
       backgroundColor: theme.colors.surface1,
       borderColor: theme.colors.border,
@@ -130,16 +121,6 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress, on
     subRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     sub: { color: theme.colors.foregroundMuted, fontSize: 11, flex: 1 },
     storyChip: { color: theme.colors.foregroundMuted, fontSize: 10 },
-    menuRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingVertical: 11,
-      paddingHorizontal: 4,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-    },
-    menuText: { color: theme.colors.foreground, fontSize: 13, flex: 1 },
   }), [theme, entity.done]);
 
   return (
@@ -165,36 +146,7 @@ function EntityCard({ entity, theme, pinned, linked, onTogglePinned, onPress, on
           #{entity.id} · {formatTime(entity.modified)}
           {entity.owner ? ` · ${entity.owner}` : ""}
         </Text>
-        {onQuickDispatch || onQuickStatus ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`更多操作 · ${entity.title}`} hitSlop={8} onPress={() => setMenuOpen(true)}>
-            <Icon name="MoreHorizontal" size={15} color={theme.colors.foregroundMuted} />
-          </Pressable>
-        ) : null}
       </View>
-      <Modal title={`单据操作 · #${entity.id}`} open={menuOpen} onOpenChange={(next) => { if (!next) setMenuOpen(false); }}>
-        <Modal.Content>
-          {onQuickDispatch ? (
-            <Pressable
-              accessibilityRole="button"
-              style={styles.menuRow}
-              onPress={() => { setMenuOpen(false); onQuickDispatch(); }}
-            >
-              <Icon name="Bot" size={15} color={theme.colors.foreground} />
-              <Text style={styles.menuText}>派给 Agent</Text>
-            </Pressable>
-          ) : null}
-          {onQuickStatus ? (
-            <Pressable
-              accessibilityRole="button"
-              style={styles.menuRow}
-              onPress={() => { setMenuOpen(false); onQuickStatus(); }}
-            >
-              <Icon name="CircleDot" size={15} color={theme.colors.foreground} />
-              <Text style={styles.menuText}>修改状态</Text>
-            </Pressable>
-          ) : null}
-        </Modal.Content>
-      </Modal>
     </Pressable>
   );
 }
@@ -206,7 +158,7 @@ type ListEntry =
   | { type: "header"; entryKey: string; group: GroupInfo }
   | { type: "card"; entryKey: string; item: BoardEntityItem };
 
-export function KindColumn({ kind, label, items, total, truncated, theme, flex, width, emptyText, grouped, favorites, linkedKeys, onToggleFavorite, onOpen, onQuickDispatch, onQuickStatus }: {
+export function KindColumn({ kind, label, items, total, truncated, theme, flex, width, emptyText, grouped, favorites, linkedKeys, onToggleFavorite, onOpen }: {
   kind: BoardEntityItem["kind"];
   label: string;
   items: BoardEntityItem[];
@@ -221,8 +173,6 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
   linkedKeys: readonly string[];
   onToggleFavorite: (key: string) => void;
   onOpen: (entity: BoardEntityItem) => void;
-  onQuickDispatch?: (entity: BoardEntityItem) => void;
-  onQuickStatus?: (entity: BoardEntityItem) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -337,8 +287,6 @@ export function KindColumn({ kind, label, items, total, truncated, theme, flex, 
                 linked={linkedKeys.includes(entry.entryKey)}
                 onTogglePinned={() => onToggleFavorite(entry.entryKey)}
                 onPress={() => onOpen(entry.item)}
-                onQuickDispatch={onQuickDispatch ? () => onQuickDispatch(entry.item) : undefined}
-                onQuickStatus={onQuickStatus ? () => onQuickStatus(entry.item) : undefined}
               />
             );
           }}

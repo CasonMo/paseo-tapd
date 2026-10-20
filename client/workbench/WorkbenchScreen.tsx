@@ -4,7 +4,7 @@ import { Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
-import { boardRpc, effectiveViews, entityRpc, filterOptionsRpc, resolveView, tapdSettings, updateCheckRpc, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
+import { boardRpc, effectiveViews, filterOptionsRpc, resolveView, tapdSettings, updateCheckRpc, type EntityKind, type TapdFilters, type TapdLink, type TapdView } from "../../shared/contracts";
 import { Chip, ToolbarButton } from "./bits";
 import { BindAgentModal } from "./BindAgentModal";
 import { ColumnPickerModal } from "./ColumnPickerModal";
@@ -88,8 +88,6 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     staleTime: 600_000,
     retry: 1,
   });
-
-  const fetchEntityDetail = useRpc(entityRpc);
 
   const fetchUpdateCheck = useRpc(updateCheckRpc);
   const updateQuery = useQuery({
@@ -330,20 +328,6 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     onOpenEntity: (target) => setDetail(target),
   };
 
-  /** 卡片快捷派发：先取详情（buildPrompt 需要描述）再打开派发弹窗 */
-  async function quickDispatch(entity: BoardEntityItem) {
-    try {
-      const data = await fetchEntityDetail({ kind: entity.kind, id: entity.id });
-      setDispatchTarget(data);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  /** 卡片快捷改状态：看板行已带 status，无需取详情 */
-  function quickStatus(entity: BoardEntityItem) {
-    setStatusTarget({ kind: entity.kind, id: entity.id, current: entity.status });
-  }
 
   return (
     <View style={styles.screen}>
@@ -443,8 +427,6 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                       linkedKeys={linkedKeys}
                        onToggleFavorite={(key) => void toggleFavorite(key)}
                        onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
-                       onQuickDispatch={(entity) => void quickDispatch(entity)}
-                       onQuickStatus={(entity) => quickStatus(entity)}
                      />
                    ))}
                  </ScrollView>
@@ -468,8 +450,6 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                     linkedKeys={linkedKeys}
                     onToggleFavorite={(key) => void toggleFavorite(key)}
                     onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
-                    onQuickDispatch={(entity) => void quickDispatch(entity)}
-                    onQuickStatus={(entity) => quickStatus(entity)}
                   />
                 ))}
               </View>
@@ -498,8 +478,6 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
                     linkedKeys={linkedKeys}
                     onToggleFavorite={(key) => void toggleFavorite(key)}
                     onOpen={(entity) => setDetail({ kind: entity.kind, id: entity.id, title: entity.title })}
-                    onQuickDispatch={(entity) => void quickDispatch(entity)}
-                    onQuickStatus={(entity) => quickStatus(entity)}
                   />
                 ))}
               </ScrollView>
