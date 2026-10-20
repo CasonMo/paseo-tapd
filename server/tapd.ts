@@ -176,9 +176,51 @@ const DEFAULT_CACHE_TTL_MS = 20_000;
 const responseCache = new Map<string, { at: number; value: unknown }>();
 const inflightRequests = new Map<string, Promise<unknown>>();
 
+// ---------------------------------------------------------------------------
+// 看板整体缓存（SWR）：过期先回旧数据 + 后台刷新，避免进工作台全量重拉白屏
+// ---------------------------------------------------------------------------
+const BOARD_CACHE_TTL_MS = 90_000;
+const boardCache = new Map<string, { at: number; result: unknown }>();
+const boardRefreshes = new Map<string, Promise<unknown>>();
+
 export function clearTapdCache(): void {
   responseCache.clear();
   inflightRequests.clear();
+  boardCache.clear();
+  boardRefreshes.clear();
+}
+
+export type StaleBoardResult<T> = T & { stale: boolean; cachedAt: string };
+
+export async function boardWithCache<T extends Record<string, unknown>>(
+  key: string,
+  fetcher: () => Promise<T>,
+  force: boolean,
+): Promise<StaleBoardResult<T>> {
+  const cached = boardCache.get(key) as { at: number; result: T } | undefined;
+  if (force || !cached) {
+    const result = await fetcher();
+    boardCache.set(key, { at: Date.now(), result });
+    return { ...result, stale: false, cachedAt: "" };
+  }
+  if (Date.now() - cached.at < BOARD_CACHE_TTL_MS) {
+    return { ...cached.result, stale: false, cachedAt: "" };
+  }
+  // 过期：后台已在刷新则复用，否则启动后台刷新；后台失败时保留旧缓存
+  let running = boardRefreshes.get(key) ?? null;
+  if (!running) {
+    running = fetcher()
+      .then((result) => {
+        boardCache.set(key, { at: Date.now(), result });
+        return result;
+      })
+      .catch(() => null)
+      .finally(() => {
+        boardRefreshes.delete(key);
+      });
+    boardRefreshes.set(key, running);
+  }
+  return { ...cached.result, stale: true, cachedAt: new Date(cached.at).toISOString() };
 }
 
 type QueryValue = string | number | undefined;
@@ -928,20 +970,19 @@ async function queryEntityRows(
   kind: EntityKind,
   params: Record<string, QueryValue>,
 ): Promise<EntityRowRef[]> {
-  const refs: EntityRowRef[] = [];
-  for (const workspaceId of config.workspaceIds) {
-    const data = await requestJson(config, LIST_PATH[kind], {
-      workspace_id: workspaceId,
-      limit: 200,
-      order: "modified desc",
-      fields: LIST_FIELDS[kind],
-      ...params,
-    });
-    for (const row of unwrapRows(data, [KIND_WRAPPER[kind]])) {
-      refs.push({ workspaceId, row });
-    }
-  }
-  return refs;
+  const groups = await Promise.all(
+    config.workspaceIds.map(async (workspaceId) => {
+      const data = await requestJson(config, LIST_PATH[kind], {
+        workspace_id: workspaceId,
+        limit: 200,
+        order: "modified desc",
+        fields: LIST_FIELDS[kind],
+        ...params,
+      });
+      return unwrapRows(data, [KIND_WRAPPER[kind]]).map((row) => ({ workspaceId, row }));
+    }),
+  );
+  return groups.flat();
 }
 
 export async function fetchColumn(

@@ -120,10 +120,14 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.status]);
 
+  // 手动刷新时绕过 daemon 看板缓存（force=true），后台刷新完成前由 stale 标记驱动 3 秒轮询
+  const boardForceRef = useRef(false);
   const board = useQuery({
     queryKey: ["tapd-board", filters ? JSON.stringify(filters) : "none"],
-    queryFn: () => rpc({ filters: filters ?? undefined }),
+    queryFn: () =>
+      rpc({ filters: filters ?? undefined, force: boardForceRef.current || undefined }),
     enabled: filters !== null,
+    refetchInterval: (query) => (query.state.data?.stale ? 3000 : false),
     staleTime: 30_000,
     retry: 1,
   });
@@ -160,6 +164,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     updated: TextStyle;
     tabRow: ViewStyle;
     errorBanner: TextStyle;
+    staleNote: TextStyle;
     updateBanner: ViewStyle;
     updateText: TextStyle;
     updateDismiss: ViewStyle;
@@ -181,6 +186,7 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     updated: { color: theme.colors.foregroundMuted, fontSize: 11 },
     tabRow: { flexDirection: "row", gap: 8 },
     errorBanner: { color: theme.colors.statusDanger, fontSize: 12, lineHeight: 18 },
+    staleNote: { color: theme.colors.foregroundMuted, fontSize: 12, lineHeight: 18 },
     updateBanner: {
       flexDirection: "row",
       alignItems: "center",
@@ -409,7 +415,18 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
           <ToolbarButton icon="Rows3" label="分组" theme={theme} active={groupByStatus} onPress={() => void toggleGrouped()} />
         ) : null}
         <ToolbarButton icon="Plus" label="新建" theme={theme} onPress={() => setCreateOpen(true)} />
-        <ToolbarButton icon="RefreshCw" label="刷新" theme={theme} busy={board.isFetching} onPress={() => void board.refetch()} />
+        <ToolbarButton
+          icon="RefreshCw"
+          label="刷新"
+          theme={theme}
+          busy={board.isFetching}
+          onPress={() => {
+            boardForceRef.current = true;
+            void board.refetch().finally(() => {
+              boardForceRef.current = false;
+            });
+          }}
+        />
         <ToolbarButton icon="Settings" theme={theme} onPress={() => setSettingsOpen(true)} />
       </View>
 
@@ -449,6 +466,11 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
               {KIND_TITLES[kind]}加载失败：{board.data.columns[kind].error}
             </Text>
           ))}
+          {board.data.stale && board.data.cachedAt ? (
+            <Text style={styles.staleNote}>
+              正在显示 {formatCachedAge(board.data.cachedAt)}的数据，后台刷新中…
+            </Text>
+          ) : null}
           {activeTab === "all" ? (
             layout.compact ? (
               <View style={{ flex: 1 }} onLayout={(event) => setBoardHeight(event.nativeEvent.layout.height)}>
@@ -671,4 +693,16 @@ function formatFetchedAt(iso: string): string {
   if (Number.isNaN(date.getTime())) return "";
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** 缓存年龄 → 「X 分钟前」（stale 提示文案用，超过 60 分钟显示小时） */
+function formatCachedAge(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const minutes = Math.max(1, Math.round((Date.now() - date.getTime()) / 60_000));
+  if (minutes >= 60) {
+    const hours = Math.round(minutes / 60);
+    return hours >= 24 ? `${Math.round(hours / 24)} 天前` : `${hours} 小时前`;
+  }
+  return `${minutes} 分钟前`;
 }

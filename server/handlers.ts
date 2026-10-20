@@ -5,6 +5,7 @@ import { DEFAULT_FILTERS, type EntityKind, type TapdSettingsValues } from "../sh
 import { getTurnRecord, type AgentTurnRecord } from "./agent-state";
 import {
   addComment,
+  boardWithCache,
   createEntity,
   describeError,
   fetchColumn,
@@ -40,64 +41,67 @@ export function createHandlers(getValues: GetValues) {
 
   return {
     async board(input: RpcInput<typeof boardRpc>): Promise<RpcOutput<typeof boardRpc>> {
-      const { config } = await requireConfig();
-      const filters = input.filters ?? DEFAULT_FILTERS;
-      const me = await fetchMe(config).catch(() => null);
-      const owner =
-        filters.ownerMode === "mine"
-          ? me?.nick ?? ""
-          : filters.ownerMode === "custom"
-            ? filters.owner.trim()
-            : "";
-      let relatedOwner = "";
-      let commented: Record<EntityKind, string[]> = { story: [], task: [], bug: [] };
-      let relatedStoryIds: string[] = [];
-      if (filters.ownerMode === "related") {
-        if (!me?.nick) {
-          throw new Error("无法识别当前用户（获取 Token 用户信息失败），「我相关的」过滤暂不可用。");
+      const key = JSON.stringify(input.filters ?? null);
+      return boardWithCache(key, async () => {
+        const { config } = await requireConfig();
+        const filters = input.filters ?? DEFAULT_FILTERS;
+        const me = await fetchMe(config).catch(() => null);
+        const owner =
+          filters.ownerMode === "mine"
+            ? me?.nick ?? ""
+            : filters.ownerMode === "custom"
+              ? filters.owner.trim()
+              : "";
+        let relatedOwner = "";
+        let commented: Record<EntityKind, string[]> = { story: [], task: [], bug: [] };
+        let relatedStoryIds: string[] = [];
+        if (filters.ownerMode === "related") {
+          if (!me?.nick) {
+            throw new Error("无法识别当前用户（获取 Token 用户信息失败），「我相关的」过滤暂不可用。");
+          }
+          relatedOwner = me.nick;
+          commented = await fetchMyCommentedIds(config, me.nick);
+          relatedStoryIds = await fetchRelatedStoryIdsFromTasks(config, me.nick, commented.task);
         }
-        relatedOwner = me.nick;
-        commented = await fetchMyCommentedIds(config, me.nick);
-        relatedStoryIds = await fetchRelatedStoryIdsFromTasks(config, me.nick, commented.task);
-      }
-      const baseOptions: Omit<ColumnQueryOptions, "relatedOwner" | "relatedCommentedIds" | "relatedStoryIds"> = {
-        owner,
-        creator: filters.creator.trim(),
-        keyword: filters.keyword.trim(),
-        label: filters.label.trim(),
-        statusScope: filters.statusScope,
-        iterationId: filters.iterationId.trim(),
-        modifiedAfter: filters.modifiedWithinDays > 0 ? isoDateDaysAgo(filters.modifiedWithinDays) : "",
-        priorities: filters.priorities,
-        severities: filters.severities,
-        conditions: filters.conditions,
-      };
-      const [story, task, bug] = await Promise.all([
-        fetchColumn(config, "story", {
-          ...baseOptions,
-          relatedOwner,
-          relatedCommentedIds: commented.story,
-          relatedStoryIds,
-        }),
-        fetchColumn(config, "task", {
-          ...baseOptions,
-          relatedOwner,
-          relatedCommentedIds: commented.task,
-          relatedStoryIds: [],
-        }),
-        fetchColumn(config, "bug", {
-          ...baseOptions,
-          relatedOwner,
-          relatedCommentedIds: commented.bug,
-          relatedStoryIds: [],
-        }),
-      ]);
-      return {
-        workspaceCount: config.workspaceIds.length,
-        tokenSource: config.tokenSource,
-        fetchedAt: new Date().toISOString(),
-        columns: { story, task, bug },
-      };
+        const baseOptions: Omit<ColumnQueryOptions, "relatedOwner" | "relatedCommentedIds" | "relatedStoryIds"> = {
+          owner,
+          creator: filters.creator.trim(),
+          keyword: filters.keyword.trim(),
+          label: filters.label.trim(),
+          statusScope: filters.statusScope,
+          iterationId: filters.iterationId.trim(),
+          modifiedAfter: filters.modifiedWithinDays > 0 ? isoDateDaysAgo(filters.modifiedWithinDays) : "",
+          priorities: filters.priorities,
+          severities: filters.severities,
+          conditions: filters.conditions,
+        };
+        const [story, task, bug] = await Promise.all([
+          fetchColumn(config, "story", {
+            ...baseOptions,
+            relatedOwner,
+            relatedCommentedIds: commented.story,
+            relatedStoryIds,
+          }),
+          fetchColumn(config, "task", {
+            ...baseOptions,
+            relatedOwner,
+            relatedCommentedIds: commented.task,
+            relatedStoryIds: [],
+          }),
+          fetchColumn(config, "bug", {
+            ...baseOptions,
+            relatedOwner,
+            relatedCommentedIds: commented.bug,
+            relatedStoryIds: [],
+          }),
+        ]);
+        return {
+          workspaceCount: config.workspaceIds.length,
+          tokenSource: config.tokenSource,
+          fetchedAt: new Date().toISOString(),
+          columns: { story, task, bug },
+        };
+      }, input.force === true);
     },
 
     async filterOptions(): Promise<RpcOutput<typeof filterOptionsRpc>> {

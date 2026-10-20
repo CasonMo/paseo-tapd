@@ -248,11 +248,17 @@ export const boardRpc = defineRpc({
   name: "tapd.board",
   input: z.object({
     filters: filtersSchema.optional(),
+    /** 绕过看板缓存强制重拉（手动刷新按钮用） */
+    force: z.boolean().optional(),
   }),
   output: z.object({
     workspaceCount: z.number(),
     tokenSource: z.enum(["env", "settings", "none"]),
     fetchedAt: z.string(),
+    /** 本结果来自已过期的缓存，daemon 正在后台刷新 */
+    stale: z.boolean().default(false),
+    /** 缓存生成时间（stale 展示用） */
+    cachedAt: z.string().default(""),
     columns: z.object({
       story: columnSchema,
       task: columnSchema,
