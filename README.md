@@ -18,7 +18,7 @@ A Paseo plugin that brings TAPD (stories, tasks, and bugs) into your Paseo works
 - Configurable board auto-refresh: set an interval in seconds under Settings → 看板 (off by default, minimum 30s); when enabled the board force-refreshes on that cadence, and the usual 3-second wave still runs whenever a background refresh is in flight
 - Settings auto-backup: when Git sync is configured, every settings change is pushed to the repository automatically about 10 seconds after the last change (debounced, silent on failure); the Push/Pull buttons stay as-is
 - Update check: when the registry pins a newer version, the workbench shows a top banner with the update command (`paseo plugin update tapd-workbench`)
-- Co-creation banner: a persistent strip at the top of the workbench links straight to the GitHub issue and pull-request flows, inviting users to help shape the plugin
+- Co-creation entry: a dismissible strip at the top of the workbench links straight to the GitHub issue and pull-request flows; closing it hides the strip for good, while Settings → 共创 keeps both links permanently
 
 ## Install
 
@@ -92,7 +92,7 @@ MIT
 - 定时自动刷新：设置 → 看板里自定义轮询间隔（秒），默认关闭、最小 30 秒；开启后看板按该间隔定时强制刷新，后台刷新在途时仍按 3 秒一拍追赶
 - 设置自动备份：配置了 Git 同步后，每次修改设置约 10 秒（去抖）后自动推送备份，未配置或失败均静默；「推送 / 拉取」按钮保持不变
 - 更新检查：registry 固定到新版本时，工作台顶部显示带更新命令的横幅（`paseo plugin update tapd-workbench`）
-- 共创入口：工作台顶部常驻「开源共创」横幅，一键前往 GitHub 提 Issue 或提 PR，欢迎一起完善插件
+- 共创入口：工作台顶部「开源共创」横幅可关闭，关闭后不再出现；设置 → 共创中永久保留提 Issue / 提 PR 入口
 
 ## 安装
 

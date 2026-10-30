@@ -9,6 +9,7 @@ import { Chip, ToolbarButton } from "./bits";
 import { BindAgentModal } from "./BindAgentModal";
 import { ColumnPickerModal } from "./ColumnPickerModal";
 import { KindColumn, StatusColumn, type BoardEntityItem } from "./ColumnView";
+import { COMMUNITY_ISSUES_URL, COMMUNITY_PULL_REQUEST_URL } from "./community";
 import { CreateEntityModal, type CreateChildPreset, type CreatedEntity } from "./CreateEntityModal";
 import { DispatchModal } from "./DispatchModal";
 import {
@@ -27,8 +28,6 @@ const KINDS = ["story", "task", "bug"] as const;
 const EMPTY_LINKS: readonly TapdLink[] = [];
 
 const KIND_TITLES: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
-const ISSUES_URL = "https://github.com/CasonMo/paseo-tapd/issues/new";
-const PULL_REQUEST_URL = "https://github.com/CasonMo/paseo-tapd/compare";
 
 type ActiveTab = EntityKind | "all";
 
@@ -184,6 +183,8 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     coCreateTitle: TextStyle;
     coCreateActions: ViewStyle;
     coCreateAction: ViewStyle;
+    coCreateDismiss: ViewStyle;
+    coCreateDismissText: TextStyle;
     modalInput: TextStyle;
     modalActions: ViewStyle;
     primaryButton: ViewStyle;
@@ -233,6 +234,8 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     coCreateTitle: { color: theme.colors.accent, fontWeight: "700" },
     coCreateActions: { flexDirection: "row", alignItems: "center", gap: 8 },
     coCreateAction: { paddingHorizontal: 10, paddingVertical: 5 },
+    coCreateDismiss: { paddingHorizontal: 4, paddingVertical: 2 },
+    coCreateDismissText: { color: theme.colors.foregroundMuted, fontSize: 12 },
     modalInput: {
       backgroundColor: theme.colors.surface2,
       borderColor: theme.colors.border,
@@ -351,6 +354,14 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     if (!ok) toast.error(readySettings.saveError ?? "保存失败，请重试");
   }
 
+  async function dismissCoCreate() {
+    const ok = await readySettings.save(
+      { ...readySettings.values, coCreateDismissed: true },
+      readySettings.revision,
+    );
+    if (!ok) toast.error(readySettings.saveError ?? "关闭提示失败，请重试");
+  }
+
   async function saveColumns(keys: string[] | null) {
     if (activeTab === "all") return;
     const values = readySettings.values;
@@ -430,29 +441,40 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
 
   return (
     <View style={styles.screen}>
-      <View style={styles.coCreateBanner}>
-        <Icon name="Sparkles" size={15} color={theme.colors.accent} />
-        <Text style={styles.coCreateText}>
-          <Text style={styles.coCreateTitle}>开源共创</Text>
-          {" · 有想法或遇到问题？欢迎一起把 TAPD 工作台打磨得更好。"}
-        </Text>
-        <View style={styles.coCreateActions}>
-          <Chip
-            label="提 Issue"
-            theme={theme}
-            color={theme.colors.accent}
-            style={styles.coCreateAction}
-            onPress={() => void openExternalUrl(ISSUES_URL)}
-          />
-          <Chip
-            label="提 PR"
-            theme={theme}
-            color={theme.colors.accent}
-            style={styles.coCreateAction}
-            onPress={() => void openExternalUrl(PULL_REQUEST_URL)}
-          />
+      {!readySettings.values.coCreateDismissed ? (
+        <View style={styles.coCreateBanner}>
+          <Icon name="Sparkles" size={15} color={theme.colors.accent} />
+          <Text style={styles.coCreateText}>
+            <Text style={styles.coCreateTitle}>开源共创</Text>
+            {" · 有想法或遇到问题？欢迎一起把 TAPD 工作台打磨得更好。"}
+          </Text>
+          <View style={styles.coCreateActions}>
+            <Chip
+              label="提 Issue"
+              theme={theme}
+              color={theme.colors.accent}
+              style={styles.coCreateAction}
+              onPress={() => void openExternalUrl(COMMUNITY_ISSUES_URL)}
+            />
+            <Chip
+              label="提 PR"
+              theme={theme}
+              color={theme.colors.accent}
+              style={styles.coCreateAction}
+              onPress={() => void openExternalUrl(COMMUNITY_PULL_REQUEST_URL)}
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="关闭共创提示"
+            hitSlop={8}
+            onPress={() => void dismissCoCreate()}
+            style={styles.coCreateDismiss}
+          >
+            <Text style={styles.coCreateDismissText}>✕</Text>
+          </Pressable>
         </View>
-      </View>
+      ) : null}
       {updateQuery.data?.updateAvailable && !updateDismissed ? (
         <View style={styles.updateBanner}>
           <Text style={styles.updateText}>

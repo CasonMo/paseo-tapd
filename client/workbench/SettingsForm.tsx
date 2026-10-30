@@ -1,4 +1,4 @@
-import { useRpc, useSettings } from "@getpaseo/plugin/client";
+import { openExternalUrl, useRpc, useSettings } from "@getpaseo/plugin/client";
 import type { PluginSurfaceProps, SettingsState } from "@getpaseo/plugin/client";
 import { Modal, useToast } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
@@ -14,6 +14,7 @@ import {
 import { checkRpc, syncPullRpc, syncPushRpc, tapdSettings } from "../../shared/contracts";
 import { PLUGIN_VERSION } from "../../shared/version";
 import type { WorkbenchTheme } from "./bits";
+import { COMMUNITY_ISSUES_URL, COMMUNITY_PULL_REQUEST_URL } from "./community";
 import { ViewsSection, type ReadySettings } from "./ViewsSection";
 
 export function TapdSettingsScreen({ theme }: PluginSurfaceProps) {
@@ -168,6 +169,22 @@ function SettingsEditor({ settings, theme }: { settings: ReadySettings; theme: W
                 else toast.error(settings.saveError ?? "保存失败，请重试");
               })();
             }}
+          />
+        </SettingsCard>
+      </SettingsSection>
+      <SettingsSection title="共创">
+        <SettingsCard>
+          <SettingsAction
+            label="有想法、遇到问题或想一起完善？"
+            hint="提交 Issue 告诉我们你的需求或问题。关闭工作台顶部提示后，这个入口仍会一直保留。"
+            actionLabel="提 Issue"
+            onPress={() => void openExternalUrl(COMMUNITY_ISSUES_URL)}
+          />
+          <SettingsAction
+            label="参与代码贡献"
+            hint="Fork 仓库、提交改动并发起 Pull Request。"
+            actionLabel="提 PR"
+            onPress={() => void openExternalUrl(COMMUNITY_PULL_REQUEST_URL)}
           />
         </SettingsCard>
       </SettingsSection>

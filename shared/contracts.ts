@@ -88,6 +88,8 @@ export const tapdSettingsSchema = z.object({
   columns: z.record(z.string(), z.array(z.string())).default({}),
   /** 聚合视图：列内按状态分组（可折叠） */
   groupByStatus: z.boolean().default(true),
+  /** 工作台顶部共创提示已关闭（设置页始终保留共创入口） */
+  coCreateDismissed: z.boolean().default(false),
   /** 单据 ↔ 工作区/Agent 关联（派活记录） */
   links: z.array(
     z.object({
@@ -129,7 +131,7 @@ export type TapdSettingsValues = z.infer<typeof tapdSettingsSchema>;
 export const tapdSettings = defineSettings({
   id: "tapd-workbench-config",
   scope: "host",
-  version: 6,
+  version: 7,
   schema: tapdSettingsSchema,
   migrate: (values, fromVersion) => {
     const previous = (values ?? {}) as Record<string, unknown>;
@@ -222,6 +224,10 @@ export const tapdSettings = defineSettings({
         views,
         defaultViewId: previousDefault === "mine" ? "" : previousDefault,
       };
+    }
+
+    if (fromVersion < 7) {
+      migrated = { ...migrated, coCreateDismissed: migrated.coCreateDismissed === true };
     }
 
     return migrated;
