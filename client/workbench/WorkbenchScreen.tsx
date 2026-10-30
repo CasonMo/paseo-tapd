@@ -1,6 +1,6 @@
-import { usePaseo, useRpc, useSettings } from "@getpaseo/plugin/client";
+import { openExternalUrl, usePaseo, useRpc, useSettings } from "@getpaseo/plugin/client";
 import type { PluginScreenProps } from "@getpaseo/plugin/client";
-import { Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native";
+import { Icon, Modal, TextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View, type TextStyle, type ViewStyle } from "react-native";
@@ -27,6 +27,8 @@ const KINDS = ["story", "task", "bug"] as const;
 const EMPTY_LINKS: readonly TapdLink[] = [];
 
 const KIND_TITLES: Record<EntityKind, string> = { story: "需求", task: "任务", bug: "缺陷" };
+const ISSUES_URL = "https://github.com/CasonMo/paseo-tapd/issues/new";
+const PULL_REQUEST_URL = "https://github.com/CasonMo/paseo-tapd/compare";
 
 type ActiveTab = EntityKind | "all";
 
@@ -177,6 +179,11 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     updateText: TextStyle;
     updateDismiss: ViewStyle;
     updateDismissText: TextStyle;
+    coCreateBanner: ViewStyle;
+    coCreateText: TextStyle;
+    coCreateTitle: TextStyle;
+    coCreateActions: ViewStyle;
+    coCreateAction: ViewStyle;
     modalInput: TextStyle;
     modalActions: ViewStyle;
     primaryButton: ViewStyle;
@@ -209,6 +216,23 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
     updateText: { flex: 1, color: theme.colors.foreground, fontSize: 12, lineHeight: 18 },
     updateDismiss: { paddingHorizontal: 4, paddingVertical: 2 },
     updateDismissText: { color: theme.colors.foregroundMuted, fontSize: 12 },
+    coCreateBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: theme.colors.surface2,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      borderLeftColor: theme.colors.accent,
+      borderLeftWidth: 3,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    coCreateText: { flex: 1, color: theme.colors.foreground, fontSize: 12, lineHeight: 18 },
+    coCreateTitle: { color: theme.colors.accent, fontWeight: "700" },
+    coCreateActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+    coCreateAction: { paddingHorizontal: 10, paddingVertical: 5 },
     modalInput: {
       backgroundColor: theme.colors.surface2,
       borderColor: theme.colors.border,
@@ -406,6 +430,29 @@ export function WorkbenchScreen({ theme, layout, navigation }: PluginScreenProps
 
   return (
     <View style={styles.screen}>
+      <View style={styles.coCreateBanner}>
+        <Icon name="Sparkles" size={15} color={theme.colors.accent} />
+        <Text style={styles.coCreateText}>
+          <Text style={styles.coCreateTitle}>开源共创</Text>
+          {" · 有想法或遇到问题？欢迎一起把 TAPD 工作台打磨得更好。"}
+        </Text>
+        <View style={styles.coCreateActions}>
+          <Chip
+            label="提 Issue"
+            theme={theme}
+            color={theme.colors.accent}
+            style={styles.coCreateAction}
+            onPress={() => void openExternalUrl(ISSUES_URL)}
+          />
+          <Chip
+            label="提 PR"
+            theme={theme}
+            color={theme.colors.accent}
+            style={styles.coCreateAction}
+            onPress={() => void openExternalUrl(PULL_REQUEST_URL)}
+          />
+        </View>
+      </View>
       {updateQuery.data?.updateAvailable && !updateDismissed ? (
         <View style={styles.updateBanner}>
           <Text style={styles.updateText}>
